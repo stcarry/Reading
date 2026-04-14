@@ -165,72 +165,70 @@ export default function Workbook() {
   };
 
 
-  // Section component
-  const Section = ({ id, icon, title, color, children, hint }) => {
-    const isExpanded = expandedSections[id] !== false; // default open
-    return (
-      <div className="glass-card-static mb-4" style={{ overflow: 'hidden' }}>
-        <button
-          onClick={() => toggleSection(id)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: 'var(--space-4) var(--space-5)', cursor: 'pointer',
-            background: 'none', border: 'none', color: 'inherit', textAlign: 'left',
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <span style={{ color: `var(--${color}-400)` }}>{icon}</span>
-            <span style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>{title}</span>
-          </div>
-          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
-        {isExpanded && (
-          <div style={{ padding: '0 var(--space-5) var(--space-5)', borderTop: '1px solid var(--border-subtle)' }}>
-            {hint && (
-              <div style={{
-                padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-3) 0',
-                background: 'var(--bg-card)', borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.7,
-                borderLeft: `3px solid var(--${color}-400)`,
-              }}>
-                💡 {hint}
-              </div>
-            )}
-            {children}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Field component
-  const Field = ({ label, value, onChange, placeholder, multiline, rows }) => (
-    <div style={{ marginBottom: 'var(--space-4)' }}>
-      <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>
-        {label}
-      </label>
-      {multiline ? (
-        <textarea
-          className="textarea"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          style={{ minHeight: rows ? rows * 28 : 80 }}
-        />
-      ) : (
-        <input
-          className="input"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-        />
+// Section component
+const Section = ({ id, icon, title, color, children, hint, expandedSections, toggleSection }) => {
+  const isExpanded = expandedSections[id] !== false; // default open
+  return (
+    <div className="glass-card-static mb-4" style={{ overflow: 'hidden' }}>
+      <button
+        onClick={() => toggleSection(id)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: 'var(--space-4) var(--space-5)', cursor: 'pointer',
+          background: 'none', border: 'none', color: 'inherit', textAlign: 'left',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <span style={{ color: `var(--${color}-400)` }}>{icon}</span>
+          <span style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>{title}</span>
+        </div>
+        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+      </button>
+      {isExpanded && (
+        <div style={{ padding: '0 var(--space-5) var(--space-5)', borderTop: '1px solid var(--border-subtle)' }}>
+          {hint && (
+            <div style={{
+              padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-3) 0',
+              background: 'var(--bg-card)', borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.7,
+              borderLeft: `3px solid var(--${color}-400)`,
+            }}>
+              💡 {hint}
+            </div>
+          )}
+          {children}
+        </div>
       )}
     </div>
   );
+};
 
-  // ─────────────────────── RENDER ───────────────────────
+// Field component
+const Field = ({ label, value, onChange, placeholder, multiline, rows }) => (
+  <div style={{ marginBottom: 'var(--space-4)' }}>
+    <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>
+      {label}
+    </label>
+    {multiline ? (
+      <textarea
+        className="textarea"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ minHeight: rows ? rows * 28 : 80 }}
+      />
+    ) : (
+      <input
+        className="input"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    )}
+  </div>
+);
 
-  return (
+export default function Workbook() {
     <div className="page-container animate-fade-in">
       <div className="page-header">
         <h1 className="page-title">📓 책 해부 워크북</h1>
@@ -345,7 +343,7 @@ export default function Workbook() {
                 🔍 Step 1: Before Reading — 읽기 전 독서 설계
               </h2>
 
-              <Section id="bookInfo" icon="📋" title="도서 기본 정보" color="teal">
+              <Section id="bookInfo" icon="📋" title="도서 기본 정보" color="teal" expandedSections={expandedSections} toggleSection={toggleSection}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                   <Field label="분야/장르" value={workbook.step1.bookInfo.genre}
                     onChange={v => handleFieldChange('step1', 'bookInfo', 'genre', v)} placeholder="예: 인문학, 과학, 경영" />
@@ -359,6 +357,7 @@ export default function Workbook() {
               </Section>
 
               <Section id="overview" icon="📝" title="책 개요 & AI 요약" color="teal"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint='AI 프롬프트 예시: "이 책의 핵심 주제와 주요 주장을 3줄로 요약해줘"'>
                 <Field label="핵심 주제 & 주요 주장 (3줄 요약)" multiline rows={4}
                   value={workbook.step1.overview.summary3Lines}
@@ -371,6 +370,7 @@ export default function Workbook() {
               </Section>
 
               <Section id="authorAnalysis" icon="🧑‍🏫" title="저자 및 배경 분석" color="teal"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint='AI 프롬프트: "이 저자의 사상적 배경과 주요 관점을 분석해줘"'>
                 <Field label="저자의 주요 관점/사상" multiline rows={3}
                   value={workbook.step1.authorAnalysis.perspective}
@@ -387,6 +387,7 @@ export default function Workbook() {
               </Section>
 
               <Section id="readingStrategy" icon="🎯" title="독서 전략" color="teal"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint="목차를 훑어보며 3가지 사전 질문을 만드세요. 질문이 있는 독서는 기억의 깊이가 다릅니다.">
                 <Field label="사전 질문 1" value={workbook.step1.readingStrategy.question1}
                   onChange={v => handleFieldChange('step1', 'readingStrategy', 'question1', v)}
@@ -420,6 +421,7 @@ export default function Workbook() {
 
               {/* Chapter Keyword Notes */}
               <Section id="chapterNotes" icon="🔑" title="키워드 요약노트 (챕터별)" color="amber"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint="챕터별로 핵심 키워드 5개와 핵심 논지를 자기 언어로 정리하세요.">
                 {workbook.step2.chapterNotes.map((cn, idx) => (
                   <div key={cn.id} style={{
@@ -466,6 +468,7 @@ export default function Workbook() {
 
               {/* AI Q&A */}
               <Section id="aiQnA" icon="💬" title="AI 심화 질의응답" color="amber"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint='어려운 개념이 나오면 AI에게 물어보고, 그 설명과 나의 생각을 함께 기록하세요.'>
                 {workbook.step2.aiQnA.map((qa, idx) => (
                   <div key={qa.id} style={{
@@ -501,6 +504,7 @@ export default function Workbook() {
 
               {/* Quotes */}
               <Section id="quotes" icon="✍️" title="문장 수집" color="amber"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint="읽으면서 마음에 남는 문장을 기록하세요. 페이지 번호를 함께 적어두면 나중에 찾기 쉽습니다.">
                 {workbook.step2.quotes.map((q, idx) => (
                   <div key={q.id} style={{
@@ -557,6 +561,7 @@ export default function Workbook() {
 
               {/* 4-Quadrant */}
               <Section id="fourQuadrant" icon="📐" title="4분할 압축 기록" color="green"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint="책 전체를 4가지 관점에서 압축하세요. 각 영역에 핵심만 담는 것이 중요합니다.">
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
                   <div style={{ padding: 'var(--space-4)', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', borderTop: '3px solid var(--teal-400)' }}>
@@ -600,6 +605,7 @@ export default function Workbook() {
 
               {/* Real-life Application */}
               <Section id="realLife" icon="🎯" title="실생활 적용" color="green"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint='AI 프롬프트: "이 책의 내용을 일, 인간관계, 자기계발 분야에 어떻게 적용할 수 있는지 구체적으로 알려줘"'>
                 <Field label="💼 일/업무에 적용" multiline rows={3}
                   value={workbook.step3.realLifeApplication.work}
@@ -617,6 +623,7 @@ export default function Workbook() {
 
               {/* Critical Thinking */}
               <Section id="criticalThinking" icon="🧐" title="비판적 사고 & 확장" color="green"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint="건설적 비판은 지식을 더 단단하게 만듭니다. 저자의 논리에 빈틈이 있는지 찾아보세요.">
                 <Field label="📌 논리적 허점/한계점" multiline rows={3}
                   value={workbook.step3.criticalThinking.logicalGaps}
@@ -638,6 +645,7 @@ export default function Workbook() {
 
               {/* 30-Day Project */}
               <Section id="thirtyDay" icon="📅" title="30일 프로젝트" color="green"
+                expandedSections={expandedSections} toggleSection={toggleSection}
                 hint="책에서 배운 것을 4주간 실천하세요. 행동 없는 독서는 미완성입니다.">
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
                   {[
