@@ -17,6 +17,69 @@ const STEPS = [
   { num: 3, title: 'After Reading', subtitle: '읽은 후 — 지식 내재화', emoji: '🧠', color: 'green' },
 ];
 
+// Section component
+const Section = ({ id, icon, title, color, children, hint, expandedSections, toggleSection }) => {
+  const isExpanded = expandedSections[id] !== false; // default open
+  return (
+    <div className="glass-card-static mb-4" style={{ overflow: 'hidden' }}>
+      <button
+        onClick={() => toggleSection(id)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: 'var(--space-4) var(--space-5)', cursor: 'pointer',
+          background: 'none', border: 'none', color: 'inherit', textAlign: 'left',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <span style={{ color: `var(--${color}-400)` }}>{icon}</span>
+          <span style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>{title}</span>
+        </div>
+        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+      </button>
+      {isExpanded && (
+        <div style={{ padding: '0 var(--space-5) var(--space-5)', borderTop: '1px solid var(--border-subtle)' }}>
+          {hint && (
+            <div style={{
+              padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-3) 0',
+              background: 'var(--bg-card)', borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.7,
+              borderLeft: `3px solid var(--${color}-400)`,
+            }}>
+              💡 {hint}
+            </div>
+          )}
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Field component
+const Field = ({ label, value, onChange, placeholder, multiline, rows }) => (
+  <div style={{ marginBottom: 'var(--space-4)' }}>
+    <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>
+      {label}
+    </label>
+    {multiline ? (
+      <textarea
+        className="textarea"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ minHeight: rows ? rows * 28 : 80 }}
+      />
+    ) : (
+      <input
+        className="input"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    )}
+  </div>
+);
+
 export default function Workbook() {
   const [books, setBooks] = useState([]);
   const [workbooks, setWorkbooks] = useState([]);
@@ -165,70 +228,9 @@ export default function Workbook() {
   };
 
 
-// Section component
-const Section = ({ id, icon, title, color, children, hint, expandedSections, toggleSection }) => {
-  const isExpanded = expandedSections[id] !== false; // default open
+  // ─────────────────────── RENDER ───────────────────────
+
   return (
-    <div className="glass-card-static mb-4" style={{ overflow: 'hidden' }}>
-      <button
-        onClick={() => toggleSection(id)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: 'var(--space-4) var(--space-5)', cursor: 'pointer',
-          background: 'none', border: 'none', color: 'inherit', textAlign: 'left',
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <span style={{ color: `var(--${color}-400)` }}>{icon}</span>
-          <span style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>{title}</span>
-        </div>
-        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-      </button>
-      {isExpanded && (
-        <div style={{ padding: '0 var(--space-5) var(--space-5)', borderTop: '1px solid var(--border-subtle)' }}>
-          {hint && (
-            <div style={{
-              padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-3) 0',
-              background: 'var(--bg-card)', borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.7,
-              borderLeft: `3px solid var(--${color}-400)`,
-            }}>
-              💡 {hint}
-            </div>
-          )}
-          {children}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Field component
-const Field = ({ label, value, onChange, placeholder, multiline, rows }) => (
-  <div style={{ marginBottom: 'var(--space-4)' }}>
-    <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>
-      {label}
-    </label>
-    {multiline ? (
-      <textarea
-        className="textarea"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{ minHeight: rows ? rows * 28 : 80 }}
-      />
-    ) : (
-      <input
-        className="input"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    )}
-  </div>
-);
-
-export default function Workbook() {
     <div className="page-container animate-fade-in">
       <div className="page-header">
         <h1 className="page-title">📓 책 해부 워크북</h1>
