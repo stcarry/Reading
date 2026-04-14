@@ -63,19 +63,19 @@ export default function Workbook() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     
     saveTimerRef.current = setTimeout(async () => {
-      setSaveStatus('저장 중...'); // 타이핑이 멈춘 후 실제 저장이 시작될 때만 표시
+      setSaveStatus('저장 중...');
       try {
         const updated = await updateWorkbook(bookId, updates);
         if (updated) {
-          // 서버에서 받은 데이터로 동기화하되, 입력 중인 상태를 덮어쓰지 않도록 신중하게 업데이트
-          setWorkbook(prev => ({ ...prev, ...updated })); 
+          // 이미 handleFieldChange에서 로컬 상태를 업데이트했으므로, 
+          // 여기서 setWorkbook을 또 호출하여 화면을 다시 그릴 필요가 없습니다.
           setSaveStatus('✓ 저장됨');
           setTimeout(() => setSaveStatus(''), 2000);
         }
       } catch (err) {
         setSaveStatus('⚠️ 저장 실패');
       }
-    }, 1000); // 대기 시간을 1초로 약간 늘려 타이핑 흐름을 덜 방해하게 함
+    }, 1000);
   }, []);
 
   const handleStartWorkbook = async () => {
