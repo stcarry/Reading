@@ -12,7 +12,7 @@ import { initSampleData } from './data/store';
 
 export default function App() {
   useEffect(() => {
-    initSampleData();
+    // initSampleData(); // 프로젝트가 Supabase로 완전히 이관되었으므로 샘플 데이터 초기화는 더 이상 필요하지 않습니다.
   }, []);
 
   return (

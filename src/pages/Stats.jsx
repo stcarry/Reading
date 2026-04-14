@@ -13,40 +13,49 @@ export default function Stats() {
   const [calendarDays, setCalendarDays] = useState([]);
 
   useEffect(() => {
-    setStats(getStats());
-    setBooks(getBooks());
-    setNotes(getNotes());
-    setReadingLog(getReadingLog());
+    const loadData = async () => {
+      const [s, b, n, log] = await Promise.all([
+        getStats(),
+        getBooks(),
+        getNotes(),
+        getReadingLog()
+      ]);
 
-    // Generate full month calendar
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = now.getDate();
+      setStats(s);
+      setBooks(b);
+      setNotes(n);
+      setReadingLog(log);
 
-    const log = getReadingLog();
-    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const readingDatesMap = {};
-    log.filter(l => l.date.startsWith(monthStr)).forEach(l => {
-      const day = parseInt(l.date.split('-')[2]);
-      readingDatesMap[day] = (readingDatesMap[day] || 0) + l.minutesRead;
-    });
+      // Generate full month calendar
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const today = now.getDate();
 
-    const days = [];
-    for (let i = 0; i < firstDay; i++) {
-      days.push({ day: null });
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-      days.push({
-        day: d,
-        isToday: d === today,
-        minutes: readingDatesMap[d] || 0,
-        hasRecord: !!readingDatesMap[d],
+      const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const readingDatesMap = {};
+      log.filter(l => l.date && l.date.startsWith(monthStr)).forEach(l => {
+        const day = parseInt(l.date.split('-')[2]);
+        readingDatesMap[day] = (readingDatesMap[day] || 0) + (l.minutesRead || 0);
       });
-    }
-    setCalendarDays(days);
+
+      const days = [];
+      for (let i = 0; i < firstDay; i++) {
+        days.push({ day: null });
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        days.push({
+          day: d,
+          isToday: d === today,
+          minutes: readingDatesMap[d] || 0,
+          hasRecord: !!readingDatesMap[d],
+        });
+      }
+      setCalendarDays(days);
+    };
+    loadData();
   }, []);
 
   // Category stats
@@ -173,10 +182,9 @@ export default function Stats() {
               <div
                 key={i}
                 className={`calendar-day ${d.hasRecord ? 'has-record' : ''} ${d.isToday ? 'today' : ''}`}
-                title={d.minutes ? `${d.minutes}분 독서` : ''}
                 style={{
-                  background: d.minutes > 0
-                    ? `rgba(245, 158, 11, ${Math.min(d.minutes / 60 * 0.3 + 0.1, 0.5)})`
+                  background: d.hasRecord
+                    ? `rgba(245, 158, 11, 0.2)`
                     : undefined,
                 }}
               >
@@ -203,28 +211,13 @@ export default function Stats() {
         {/* Monthly Trend */}
         <div className="glass-card-static" style={{ padding: 'var(--space-6)' }}>
           <h3 style={{ fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-            📈 월별 독서 시간
+            📚 지식 누적 현황
           </h3>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--space-3)', height: 180, paddingTop: 'var(--space-4)' }}>
-            {monthlyReadingData.map((m, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)' }}>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  {m.minutes > 0 ? `${Math.round(m.minutes / 60)}h` : ''}
-                </span>
-                <div
-                  style={{
-                    width: '100%',
-                    height: `${Math.max((m.minutes / maxMonthMinutes) * 140, 4)}px`,
-                    background: i === monthlyReadingData.length - 1
-                      ? 'linear-gradient(180deg, var(--amber-400), var(--amber-600))'
-                      : 'linear-gradient(180deg, rgba(245,158,11,0.3), rgba(245,158,11,0.1))',
-                    borderRadius: 'var(--radius-sm)',
-                    transition: 'height var(--transition-slow)',
-                  }}
-                />
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{m.label}</span>
-              </div>
-            ))}
+          <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
+             <div style={{ fontSize: 'var(--text-4xl)', fontWeight: 800, color: 'var(--amber-400)', marginBottom: 'var(--space-2)' }}>
+               {stats.totalBooks}
+             </div>
+             <p style={{ color: 'var(--text-secondary)' }}>전체 서재에 등록된 도서 수</p>
           </div>
         </div>
 
@@ -281,20 +274,54 @@ export default function Stats() {
               기록에서 키워드를 추출하면 여기에 표시됩니다
             </div>
           ) : (
-            <div className="keyword-cloud" style={{ padding: 0 }}>
+            <div className="keyword-cloud" style={{ 
+              padding: 'var(--space-4)', 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: 'var(--space-3) var(--space-6)',
+              minHeight: '280px',
+              background: 'rgba(255,255,255,0.02)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px dashed var(--border-subtle)'
+            }}>
               {topKeywords.map((kw, i) => {
-                const colors = ['amber', 'teal', 'violet', 'rose', 'green'];
+                const colors = ['var(--amber-400)', 'var(--teal-400)', 'var(--violet-400)', 'var(--rose-400)', 'var(--green-400)', 'var(--text-primary)'];
                 const color = colors[i % colors.length];
+                // 빈도수에 따른 폰트 사이즈 (14px ~ 42px)
+                const fontSize = Math.min(14 + kw.count * 8, 42);
+                // 약 15% 확률로 세로 회전
+                const rotate = i % 7 === 0 ? 'rotate(-90deg)' : 'none';
+                const opacity = Math.max(0.4, Math.min(1, 0.3 + (kw.count * 0.2)));
+                
                 return (
                   <span
                     key={i}
-                    className={`tag tag-${color}`}
                     style={{
-                      fontSize: `${Math.min(12 + kw.count * 3, 22)}px`,
-                      padding: 'var(--space-2) var(--space-3)',
+                      fontSize: `${fontSize}px`,
+                      fontWeight: kw.count > 1 ? 800 : 500,
+                      color: color,
+                      opacity: opacity,
+                      transform: rotate,
+                      display: 'inline-block',
+                      transition: 'all 0.3s ease',
+                      cursor: 'default',
+                      textShadow: kw.count > 2 ? `0 0 20px ${color}33` : 'none',
+                      whiteSpace: 'nowrap',
+                      lineHeight: 1,
+                      margin: '4px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.opacity = 1;
+                      e.target.style.transform = `${rotate} scale(1.1)`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.opacity = opacity;
+                      e.target.style.transform = rotate;
                     }}
                   >
-                    {kw.word} ×{kw.count}
+                    {kw.word}
                   </span>
                 );
               })}
@@ -355,9 +382,9 @@ export default function Stats() {
         <div className="flex justify-center gap-6" style={{ flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, color: 'var(--amber-400)' }}>
-              {Math.round(stats.totalMinutes / 60)}
+              {stats.totalBooks}
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>시간 독서</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>전체 서재</div>
           </div>
           <div>
             <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, color: 'var(--teal-400)' }}>

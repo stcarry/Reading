@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Map, Hammer, Link2, FileEdit, MessageCircle,
+  Map, Hammer, Link2, MessageCircle,
   Send, BookOpen, ChevronRight, Sparkles, Loader, Trash2, FileEdit,
   Mic, Users, Swords, GraduationCap, Brain, AlertCircle
 } from 'lucide-react';
 import { getBooks, getBooksByStatus, addNote, getCoachingSessions, addCoachingSession, updateCoachingSession } from '../data/store';
 import { callOpenAI } from '../utils/openai';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const STEPS = [
   { num: 1, icon: Map, title: '예열', subtitle: '구조 파악 (지도 그리기)', color: 'teal', emoji: '🗺', timing: '읽기 전' },
@@ -159,23 +161,37 @@ export default function Coaching() {
   };
 
   useEffect(() => {
-    if (currentSessionId && messages.length > 0) {
-      updateCoachingSession(currentSessionId, { messages });
-    }
+    const syncSession = async () => {
+      if (currentSessionId && messages.length > 0) {
+        try {
+          await updateCoachingSession(currentSessionId, { messages });
+        } catch (err) {
+          console.error('Session sync failed:', err);
+        }
+      }
+    };
+    syncSession();
   }, [messages, currentSessionId]);
 
   const handleStep3Submit = async () => {
     if (!step3Form.chapter.trim() || !step3Form.keywords.trim() || !step3Form.summary.trim() || isLoading) return;
     
+    if (!selectedBook) {
+      alert('코칭할 책을 먼저 선택해주세요.');
+      return;
+    }
+
     // 기록노트(Notes)에 저장
-    addNote({
+    const savedNote = await addNote({
       bookId: selectedBook.id,
       type: 'keyword',
       chapter: step3Form.chapter,
-      keywords: step3Form.keywords.split(',').map(k => k.trim()),
+      keywords: step3Form.keywords.split(/[,\s]+/).filter(k => k.trim()), // 쉼표 또는 공백으로 구분
       content: step3Form.summary,
       category: 'knowledge'
     });
+    
+    console.log('Note saved locally:', savedNote);
 
     // 채팅창 프롬프트 구성 및 실행
     const promptText = `방금 읽은 [${step3Form.chapter}] 챕터의 키워드는 [${step3Form.keywords}]이고, 내용은 "${step3Form.summary}"로 요약했어. 이 키워드 선정이 적절한지 평가해주고, 다음 챕터와의 연결고리를 피드백 해줘.`;
@@ -201,13 +217,14 @@ export default function Coaching() {
   };
 
   useEffect(() => {
-    const allBooks = getBooks();
-    setBooks(allBooks);
-    const bookId = searchParams.get('bookId');
-    if (bookId) {
-      const book = allBooks.find(b => b.id === bookId);
-      if (book) setSelectedBook(book);
-    }
+    getBooks().then(allBooks => {
+      setBooks(allBooks);
+      const bookId = searchParams.get('bookId');
+      if (bookId) {
+        const book = allBooks.find(b => b.id === bookId);
+        if (book) setSelectedBook(book);
+      }
+    });
   }, [searchParams]);
 
   useEffect(() => {
@@ -226,7 +243,7 @@ export default function Coaching() {
     setTimeout(() => startStep(1, book), 0);
   };
 
-  const startStep = (step, bookOverride = null) => {
+  const startStep = async (step, bookOverride = null) => {
     const book = bookOverride || selectedBook;
     if (!book) return;
     if (step === 5) {
@@ -238,8 +255,8 @@ export default function Coaching() {
     }
     
     // 세션 기록 불러오기
-    const sessions = getCoachingSessions();
-    const session = sessions.find(s => s.bookId === book.id && s.step === step);
+    const sessions = await getCoachingSessions();
+    const session = sessions.find(s => s.bookId === book.id && String(s.step) === String(step));
     
     if (session && session.messages?.length > 0) {
       setMessages(session.messages);
@@ -253,7 +270,7 @@ export default function Coaching() {
         role: 'ai',
         content: getStepIntro(step, book.title),
       }];
-      const newSession = addCoachingSession({ bookId: book.id, step, messages: initialMessages });
+      const newSession = await addCoachingSession({ bookId: book.id, step, messages: initialMessages });
       setCurrentSessionId(newSession.id);
       setMessages(initialMessages);
     }
@@ -323,7 +340,7 @@ export default function Coaching() {
     setIsLoading(true);
 
     try {
-      const modelToUse = currentStep === 1 ? 'o1-mini' : 'gpt-4o';
+      const modelToUse = 'gpt-4o'; // o1-mini 접근 권한 이슈로 인해 전 단계 gpt-4o로 통합 사용
       const aiResponse = await callOpenAI(newMessages, modelToUse);
       setMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
     } catch (error) {
@@ -592,8 +609,10 @@ export default function Coaching() {
                           </div>
                         ) : (
                           <>
-                            <div style={{ whiteSpace: 'pre-wrap' }}>
-                              {msg.displayContent || msg.content}
+                            <div className="markdown-content">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {msg.displayContent || msg.content}
+                              </ReactMarkdown>
                             </div>
                             <div style={{ marginTop: 'var(--space-3)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-2)', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)' }}>
                               {currentStep === 4 && msg.role === 'ai' && idx > 1 && editingMessageIdx !== idx && (

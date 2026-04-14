@@ -26,6 +26,7 @@ export default function Notes() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('all');
+  const [activeBookFilter, setActiveBookFilter] = useState('all');
 
   const [form, setForm] = useState({
     bookId: '',
@@ -44,8 +45,37 @@ export default function Notes() {
   const [timeLeft, setTimeLeft] = useState(600);
 
   useEffect(() => {
-    setNotes(getNotes());
-    setBooks(getBooks());
+    refresh();
+  }, []);
+
+  const refresh = async () => {
+    const [fetchedNotes, fetchedBooks] = await Promise.all([
+      getNotes(),
+      getBooks()
+    ]);
+    setNotes(fetchedNotes);
+    setBooks(fetchedBooks);
+  };
+
+  useEffect(() => {
+    const handleDataChange = (e) => {
+      if (!e.detail || e.detail.key === 'rg_notes') {
+        refresh();
+      }
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'rg_notes' || e.key === null) {
+        refresh();
+      }
+    };
+
+    window.addEventListener('rg-data-change', handleDataChange);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('rg-data-change', handleDataChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -64,9 +94,9 @@ export default function Notes() {
     }
   }, [timer]);
 
-  const refresh = () => setNotes(getNotes());
 
-  const handleAdd = () => {
+
+  const handleAdd = async () => {
     let content = form.content;
     
     // 3단 구조일 경우 구조화된 내용 조합
@@ -77,7 +107,7 @@ export default function Notes() {
     
     const keywords = [form.keyword1, form.keyword2].filter(k => k.trim());
     
-    addNote({
+    await addNote({
       bookId: form.bookId,
       type: form.type,
       chapter: form.chapter,
@@ -91,7 +121,7 @@ export default function Notes() {
       } : undefined,
     });
     
-    refresh();
+    await refresh();
     setShowAddModal(false);
     setForm({
       bookId: '', type: 'keyword', chapter: '', keyword1: '', keyword2: '',
@@ -101,10 +131,10 @@ export default function Notes() {
     setTimeLeft(600);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('이 기록을 삭제할까요?')) {
-      deleteNote(id);
-      refresh();
+      await deleteNote(id);
+      await refresh();
     }
   };
 
@@ -125,6 +155,9 @@ export default function Notes() {
   }
   if (activeCategoryFilter !== 'all') {
     filteredNotes = filteredNotes.filter(n => n.category === activeCategoryFilter);
+  }
+  if (activeBookFilter !== 'all') {
+    filteredNotes = filteredNotes.filter(n => n.bookId === activeBookFilter);
   }
   filteredNotes = filteredNotes.slice().reverse();
 
@@ -217,27 +250,57 @@ export default function Notes() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6" style={{ flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)' }}>유형별</div>
-          <div className="tabs" style={{ width: 'fit-content' }}>
-            <button className={`tab ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => setActiveFilter('all')}>전체</button>
-            {NOTE_TYPES.map(t => (
-              <button key={t.key} className={`tab ${activeFilter === t.key ? 'active' : ''}`} onClick={() => setActiveFilter(t.key)}>
-                {t.label}
+      <div className="flex flex-col gap-6 mb-8">
+        {/* Book Filter */}
+        {books.length > 0 && (
+          <div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+              <BookCheck size={12} /> 도서별 분류
+            </div>
+            <div className="tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)', background: 'transparent', padding: 0 }}>
+              <button
+                className={`tab ${activeBookFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setActiveBookFilter('all')}
+                style={{ borderRadius: 'var(--radius-full)', padding: '6px 16px' }}
+              >
+                전체 도서
               </button>
-            ))}
+              {books.map(b => (
+                <button
+                  key={b.id}
+                  className={`tab ${activeBookFilter === b.id ? 'active' : ''}`}
+                  onClick={() => setActiveBookFilter(b.id)}
+                  style={{ borderRadius: 'var(--radius-full)', padding: '6px 16px' }}
+                >
+                  {b.title}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)' }}>5영역 분류</div>
-          <div className="tabs" style={{ width: 'fit-content' }}>
-            <button className={`tab ${activeCategoryFilter === 'all' ? 'active' : ''}`} onClick={() => setActiveCategoryFilter('all')}>전체</button>
-            {CATEGORIES.map(c => (
-              <button key={c.key} className={`tab ${activeCategoryFilter === c.key ? 'active' : ''}`} onClick={() => setActiveCategoryFilter(c.key)}>
-                {c.label}
-              </button>
-            ))}
+        )}
+
+        <div className="flex gap-4" style={{ flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)' }}>유형별</div>
+            <div className="tabs" style={{ width: 'fit-content' }}>
+              <button className={`tab ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => setActiveFilter('all')}>전체</button>
+              {NOTE_TYPES.map(t => (
+                <button key={t.key} className={`tab ${activeFilter === t.key ? 'active' : ''}`} onClick={() => setActiveFilter(t.key)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)' }}>5영역 분류</div>
+            <div className="tabs" style={{ width: 'fit-content' }}>
+              <button className={`tab ${activeCategoryFilter === 'all' ? 'active' : ''}`} onClick={() => setActiveCategoryFilter('all')}>전체</button>
+              {CATEGORIES.map(c => (
+                <button key={c.key} className={`tab ${activeCategoryFilter === c.key ? 'active' : ''}`} onClick={() => setActiveCategoryFilter(c.key)}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

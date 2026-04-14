@@ -19,6 +19,7 @@ const STEPS = [
 
 export default function Workbook() {
   const [books, setBooks] = useState([]);
+  const [workbooks, setWorkbooks] = useState([]);
   const [selectedBookId, setSelectedBookId] = useState('');
   const [workbook, setWorkbook] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -27,54 +28,78 @@ export default function Workbook() {
   const saveTimerRef = useRef(null);
 
   useEffect(() => {
-    setBooks(getBooks());
-    // Auto-select first book with existing workbook or reading book
-    const allWorkbooks = getWorkbooks();
-    if (allWorkbooks.length > 0) {
-      setSelectedBookId(allWorkbooks[0].bookId);
-    }
+    const loadInitialData = async () => {
+      const fetchedBooks = await getBooks();
+      setBooks(fetchedBooks);
+      
+      const allWorkbooks = await getWorkbooks();
+      setWorkbooks(allWorkbooks);
+      if (allWorkbooks.length > 0) {
+        setSelectedBookId(allWorkbooks[0].bookId);
+      }
+    };
+    loadInitialData();
   }, []);
 
   useEffect(() => {
-    if (!selectedBookId) {
-      setWorkbook(null);
-      return;
-    }
-    const wb = getWorkbook(selectedBookId);
-    if (wb) {
-      setWorkbook(wb);
-      setCurrentStep(wb.currentStep || 1);
-    } else {
-      setWorkbook(null);
-    }
+    const loadWorkbook = async () => {
+      if (!selectedBookId) {
+        setWorkbook(null);
+        return;
+      }
+      const wb = await getWorkbook(selectedBookId);
+      if (wb) {
+        setWorkbook(wb);
+        setCurrentStep(wb.currentStep || 1);
+      } else {
+        setWorkbook(null);
+      }
+    };
+    loadWorkbook();
   }, [selectedBookId]);
 
   // Auto-save with debounce
   const autoSave = useCallback((bookId, updates) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveStatus('저장 중...');
-    saveTimerRef.current = setTimeout(() => {
-      const updated = updateWorkbook(bookId, updates);
-      if (updated) {
-        setWorkbook({ ...updated });
-        setSaveStatus('✓ 저장됨');
-        setTimeout(() => setSaveStatus(''), 2000);
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        const updated = await updateWorkbook(bookId, updates);
+        if (updated) {
+          setWorkbook({ ...updated });
+          setSaveStatus('✓ 저장됨');
+          setTimeout(() => setSaveStatus(''), 2000);
+        }
+      } catch (err) {
+        setSaveStatus('⚠️ 저장 실패');
       }
     }, 500);
   }, []);
 
-  const handleStartWorkbook = () => {
+  const handleStartWorkbook = async () => {
     if (!selectedBookId) return;
     const book = books.find(b => b.id === selectedBookId);
     if (!book) return;
-    const wb = createWorkbook(selectedBookId, book.title, book.author);
-    setWorkbook(wb);
-    setCurrentStep(1);
-    setExpandedSections({ 'bookInfo': true });
+    try {
+      const wb = await createWorkbook(selectedBookId, book.title, book.author);
+      setWorkbook(wb);
+      setCurrentStep(1);
+      setExpandedSections({ 'bookInfo': true });
+    } catch (err) {
+      alert('워크북 생성 실패: ' + err.message);
+    }
   };
 
   const handleFieldChange = (stepKey, sectionKey, fieldKey, value) => {
     if (!workbook) return;
+    
+    // Update local state immediately for performance
+    const newWorkbook = { ...workbook };
+    if (!newWorkbook[stepKey]) newWorkbook[stepKey] = {};
+    if (!newWorkbook[stepKey][sectionKey]) newWorkbook[stepKey][sectionKey] = {};
+    newWorkbook[stepKey][sectionKey][fieldKey] = value;
+    setWorkbook(newWorkbook);
+
     autoSave(workbook.bookId, {
       [stepKey]: { [sectionKey]: { [fieldKey]: value } },
     });
@@ -85,6 +110,13 @@ export default function Workbook() {
     const arr = workbook[stepKey][arrayKey].map(item =>
       item.id === itemId ? { ...item, [fieldKey]: value } : item
     );
+    
+    // Local state update
+    setWorkbook({
+      ...workbook,
+      [stepKey]: { ...workbook[stepKey], [arrayKey]: arr }
+    });
+
     autoSave(workbook.bookId, { [stepKey]: { [arrayKey]: arr } });
   };
 
@@ -98,18 +130,24 @@ export default function Workbook() {
       }
       return item;
     });
+    
+    setWorkbook({
+      ...workbook,
+      step2: { ...workbook.step2, chapterNotes: arr }
+    });
+
     autoSave(workbook.bookId, { step2: { chapterNotes: arr } });
   };
 
-  const handleAddItem = (stepKey, arrayKey) => {
+  const handleAddItem = async (stepKey, arrayKey) => {
     if (!workbook) return;
-    const updated = addRepeatableItem(workbook.bookId, stepKey, arrayKey);
+    const updated = await addRepeatableItem(workbook.bookId, stepKey, arrayKey);
     if (updated) setWorkbook({ ...updated });
   };
 
-  const handleRemoveItem = (stepKey, arrayKey, itemId) => {
+  const handleRemoveItem = async (stepKey, arrayKey, itemId) => {
     if (!workbook) return;
-    const updated = removeRepeatableItem(workbook.bookId, stepKey, arrayKey, itemId);
+    const updated = await removeRepeatableItem(workbook.bookId, stepKey, arrayKey, itemId);
     if (updated) setWorkbook({ ...updated });
   };
 
@@ -200,8 +238,7 @@ export default function Workbook() {
         </p>
       </div>
 
-      {/* Book Selector */}
-      <div className="glass-card-static mb-6" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+<div className="glass-card-static mb-6" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
         <BookOpen size={20} style={{ color: 'var(--amber-400)', flexShrink: 0 }} />
         <select
           className="input"
@@ -210,11 +247,14 @@ export default function Workbook() {
           style={{ flex: 1, padding: 'var(--space-2) var(--space-3)' }}
         >
           <option value="">📚 도서를 선택하세요</option>
-          {books.map(b => (
-            <option key={b.id} value={b.id}>
-              {b.title} — {b.author} {getWorkbook(b.id) ? '✅' : ''}
-            </option>
-          ))}
+          {books.map(b => {
+            const hasWorkbook = workbooks.some(w => w.bookId === b.id);
+            return (
+              <option key={b.id} value={b.id}>
+                {b.title} — {b.author} {hasWorkbook ? '✅' : ''}
+              </option>
+            );
+          })}
         </select>
         {selectedBookId && !workbook && (
           <button className="btn btn-primary" onClick={handleStartWorkbook}>

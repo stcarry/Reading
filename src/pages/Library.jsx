@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Search, Plus, BookMarked, X, Star, ChevronDown, Trash2, Edit3
 } from 'lucide-react';
-import { getBooks, addBook, updateBook, deleteBook, searchBooks } from '../data/store';
+import { getBooks, addBook, updateBook, deleteBook, searchBooks, onAuthStateChange } from '../data/store';
 
 const STATUS_LABELS = {
   reading: { label: '읽는 중', color: 'amber' },
@@ -22,10 +22,29 @@ export default function Library() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   useEffect(() => {
-    setBooks(getBooks());
+    // 인증 상태 변경 감지 및 데이터 로드
+    const { data: { subscription } } = onAuthStateChange(async (event, user) => {
+      console.log('Auth event in Library:', event, user?.email);
+      if (user) {
+        const data = await getBooks();
+        setBooks(data);
+      } else {
+        setBooks([]);
+      }
+    });
+
+    // 초기 로드
+    getBooks().then(setBooks);
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  const refresh = () => setBooks(getBooks());
+  const refresh = async () => {
+    const data = await getBooks();
+    setBooks(data);
+  };
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
@@ -35,44 +54,64 @@ export default function Library() {
     setIsSearching(false);
   }, [searchQuery]);
 
-  const handleAddFromSearch = (result) => {
-    addBook({
-      title: result.title,
-      author: result.author,
-      cover: result.cover,
-      isbn: result.isbn,
-      totalPages: result.totalPages,
-      description: result.description,
-    });
-    refresh();
-    setShowAddModal(false);
-    setSearchQuery('');
-    setSearchResults([]);
+  const handleAddFromSearch = async (result) => {
+    try {
+      console.log('Adding book from search:', result);
+      await addBook({
+        title: result.title,
+        author: result.author,
+        cover: result.cover,
+        isbn: result.isbn,
+        totalPages: result.totalPages,
+        description: result.description,
+      });
+      
+      // 저장이 완료된 후 목록 갱신 및 모달 닫기
+      await refresh();
+      setShowAddModal(false);
+      setSearchQuery('');
+      setSearchResults([]);
+      console.log('Book added successfully');
+    } catch (err) {
+      console.error('Failed to add book:', err);
+      alert('도서 추가에 실패했습니다: ' + err.message);
+    }
   };
 
-  const handleAddManual = () => {
+  const handleAddManual = async () => {
     if (!manualForm.title.trim()) return;
-    addBook({
-      title: manualForm.title,
-      author: manualForm.author,
-      totalPages: parseInt(manualForm.totalPages) || 0,
-    });
-    refresh();
-    setShowAddModal(false);
-    setManualForm({ title: '', author: '', totalPages: '' });
-    setManualMode(false);
+    try {
+      await addBook({
+        title: manualForm.title,
+        author: manualForm.author,
+        totalPages: parseInt(manualForm.totalPages) || 0,
+      });
+      await refresh();
+      setShowAddModal(false);
+      setManualForm({ title: '', author: '', totalPages: '' });
+      setManualMode(false);
+    } catch (err) {
+      alert('도서 추가 실패: ' + err.message);
+    }
   };
 
-  const handleStatusChange = (bookId, status) => {
+  const handleStatusChange = async (bookId, status) => {
     const updates = { status };
-    if (status === 'reading' && !getBooks().find(b => b.id === bookId)?.startDate) {
-      updates.startDate = new Date().toISOString().split('T')[0];
+    const book = books.find(b => b.id === bookId);
+    
+    if (status === 'reading' && !book?.startDate) {
+      updates.start_date = new Date().toISOString().split('T')[0];
     }
-    if (status === 'done') {
-      updates.endDate = new Date().toISOString().split('T')[0];
+    if (status === 'done' && !book?.end_date) {
+      updates.end_date = new Date().toISOString().split('T')[0];
     }
-    updateBook(bookId, updates);
-    refresh();
+    
+    try {
+      await updateBook(bookId, updates);
+      await refresh();
+    } catch (err) {
+      alert('상태 변경 실패: ' + err.message);
+    }
   };
 
   const handleDelete = (e, bookId) => {
@@ -80,10 +119,10 @@ export default function Library() {
     setDeleteConfirmId(bookId);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteConfirmId) {
-      deleteBook(deleteConfirmId);
-      refresh();
+      await deleteBook(deleteConfirmId);
+      await refresh();
       setDeleteConfirmId(null);
     }
   };
@@ -180,6 +219,35 @@ export default function Library() {
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                       {progress}% ({book.currentPage}/{book.totalPages}p)
                     </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 'var(--space-2)' }}>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        max={book.totalPages || 99999}
+                        value={book.currentPage}
+                        onChange={async (e) => {
+                          const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), book.totalPages || 99999);
+                          await updateBook(book.id, { current_page: val });
+                          await refresh();
+                        }}
+                        style={{ width: '70px', fontSize: 'var(--text-xs)', padding: '4px 6px', textAlign: 'center' }}
+                        title="현재 페이지"
+                      />
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>p</span>
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '10px', padding: '3px 8px', marginLeft: '2px' }}
+                        onClick={async () => {
+                          const newPage = Math.min((book.currentPage || 0) + 10, book.totalPages || 99999);
+                          await updateBook(book.id, { current_page: newPage });
+                          await refresh();
+                        }}
+                        title="10페이지 추가"
+                      >
+                        +10p
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -270,8 +338,16 @@ export default function Library() {
                     {isSearching ? '검색 중...' : '검색'}
                   </button>
 
-                  {/* Search Results */}
-                  <div className="flex flex-col gap-3 mt-4" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                  {/* Search Results - 카드 그리드 레이아웃 */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', 
+                    gap: 'var(--space-3)',
+                    marginTop: 'var(--space-4)',
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    padding: 'var(--space-2)'
+                  }}>
                     {searchResults.map((result, idx) => (
                       <div
                         key={idx}
@@ -279,49 +355,55 @@ export default function Library() {
                         style={{
                           padding: 'var(--space-3)',
                           display: 'flex',
-                          gap: 'var(--space-3)',
-                          cursor: 'pointer',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          gap: 'var(--space-2)',
                         }}
-                        onClick={() => handleAddFromSearch(result)}
                       >
                         <div style={{
-                          width: 50, height: 70, borderRadius: 'var(--radius-sm)',
-                          overflow: 'hidden', background: 'var(--bg-tertiary)', flexShrink: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          width: '100%',
+                          aspectRatio: '2/3',
+                          borderRadius: 'var(--radius-sm)',
+                          overflow: 'hidden',
+                          background: 'var(--bg-tertiary)',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
                         }}>
                           {result.cover ? (
                             <img src={result.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
-                            <BookMarked size={18} style={{ opacity: 0.3 }} />
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.3 }}>
+                              <BookMarked size={24} />
+                            </div>
                           )}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{result.title}</div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{result.author}</div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                            {result.totalPages > 0 && `${result.totalPages}p`}
-                            {result.publishedDate && ` · ${result.publishedDate}`}
+                        <div style={{ flex: 1, width: '100%', minHeight: '3.2em' }}>
+                          <div style={{ 
+                            fontWeight: 700, 
+                            fontSize: '11px', 
+                            display: '-webkit-box', 
+                            WebkitLineClamp: 2, 
+                            WebkitBoxOrient: 'vertical', 
+                            overflow: 'hidden',
+                            lineHeight: 1.2
+                          }}>
+                            {result.title}
+                          </div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {result.author}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                          <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleAddFromSearch(result); }}>추가</button>
-                          {result.isbn && (
-                            <a
-                              href={getKyoboLink(result.isbn)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn btn-ghost btn-sm"
-                              style={{ fontSize: '10px', padding: '2px 4px' }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              교보 정보
-                            </a>
-                          )}
-                        </div>
+                        <button 
+                          className="btn btn-primary btn-sm w-full" 
+                          onClick={() => handleAddFromSearch(result)}
+                          style={{ fontSize: '11px', padding: '4px 0' }}
+                        >
+                          추가하기
+                        </button>
                       </div>
                     ))}
                     {searchResults.length === 0 && searchQuery && !isSearching && (
-                      <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 'var(--space-6)', fontSize: 'var(--text-sm)' }}>
+                      <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--text-tertiary)', padding: 'var(--space-6)', fontSize: 'var(--text-sm)' }}>
                         검색 결과가 없습니다. 직접 입력으로 추가해보세요.
                       </div>
                     )}

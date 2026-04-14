@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BookOpen, Brain, FileText, TrendingUp, Clock,
-  ChevronRight, Flame, Target, BookMarked, Plus
+  Library, Sparkles, PenTool, TrendingUp, Timer,
+  ChevronRight, CalendarCheck, Trophy, BookMarked, Plus, Hash
 } from 'lucide-react';
-import { getBooks, getNotes, getReadingLog, getStats } from '../data/store';
+import { getBooks, getNotes, getReadingLog, getStats, updateBook } from '../data/store';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -13,36 +13,46 @@ export default function Dashboard() {
   const [calendarDays, setCalendarDays] = useState([]);
 
   useEffect(() => {
-    setStats(getStats());
-    setBooks(getBooks());
-    setRecentNotes(getNotes().slice(-3).reverse());
+    const loadDashboardData = async () => {
+      const [fetchedStats, fetchedBooks, fetchedNotes, fetchedLogs] = await Promise.all([
+        getStats(),
+        getBooks(),
+        getNotes(),
+        getReadingLog()
+      ]);
 
-    // Generate calendar days for current month
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = now.getDate();
+      setStats(fetchedStats);
+      setBooks(fetchedBooks);
+      setRecentNotes(fetchedNotes.slice(-3).reverse());
 
-    const log = getReadingLog();
-    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const readingDates = new Set(
-      log.filter(l => l.date.startsWith(monthStr)).map(l => parseInt(l.date.split('-')[2]))
-    );
+      // Generate calendar days for current month
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const today = now.getDate();
 
-    const days = [];
-    for (let i = 0; i < firstDay; i++) {
-      days.push({ day: null });
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-      days.push({
-        day: d,
-        isToday: d === today,
-        hasRecord: readingDates.has(d),
-      });
-    }
-    setCalendarDays(days);
+      const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const readingDates = new Set(
+        fetchedLogs.filter(l => l.date.startsWith(monthStr)).map(l => parseInt(l.date.split('-')[2]))
+      );
+
+      const days = [];
+      for (let i = 0; i < firstDay; i++) {
+        days.push({ day: null });
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        days.push({
+          day: d,
+          isToday: d === today,
+          hasRecord: readingDates.has(d),
+        });
+      }
+      setCalendarDays(days);
+    };
+
+    loadDashboardData();
   }, []);
 
   const readingBooks = useMemo(() => books.filter(b => b.status === 'reading'), [books]);
@@ -59,56 +69,115 @@ export default function Dashboard() {
 
   return (
     <div className="page-container animate-fade-in">
-      {/* Header */}
-      <div className="page-header">
-        <h1 className="page-title">
-          안녕하세요! 📚
-        </h1>
-        <p className="page-subtitle">
-          오늘도 한 걸음 성장하는 독서를 시작해볼까요?
-        </p>
-      </div>
+      {/* Hero Header — Minimal & Modern */}
+      <div style={{
+        marginBottom: 'var(--space-8)',
+        padding: 'var(--space-8) var(--space-8)',
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(20,184,166,0.04) 50%, transparent 100%)',
+        borderRadius: 'var(--radius-xl)',
+        border: '1px solid var(--border-glass)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Subtle decorative accent */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+          background: 'linear-gradient(90deg, var(--amber-500), var(--teal-400), var(--violet-400))',
+          opacity: 0.6,
+        }} />
 
-      {/* Stats Grid */}
-      <div className="stats-grid stagger-children" style={{ marginBottom: 'var(--space-8)' }}>
-        <div className="glass-card stat-card">
-          <div className="stat-card-icon" style={{ background: 'var(--amber-glow)', color: 'var(--amber-400)' }}>
-            <BookOpen size={20} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>
+            <p style={{
+              fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--amber-400)',
+              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 'var(--space-2)',
+            }}>
+              Reading Giant
+            </p>
+            <h1 style={{
+              fontSize: 'var(--text-2xl)', fontWeight: 800, letterSpacing: '-0.03em',
+              marginBottom: 'var(--space-1)', color: 'var(--text-primary)',
+            }}>
+              안녕하세요, 오늘도 성장하는 하루 되세요.
+            </h1>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)' }}>
+              {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+            </p>
           </div>
-          <div className="stat-card-value" style={{ color: 'var(--amber-400)' }}>
-            {stats.readingBooks}
-          </div>
-          <div className="stat-card-label">읽고 있는 책</div>
         </div>
 
-        <div className="glass-card stat-card">
-          <div className="stat-card-icon" style={{ background: 'var(--green-glow)', color: 'var(--green-400)' }}>
-            <Target size={20} />
+        {/* Inline Stats Row */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 'var(--space-4)',
+          marginTop: 'var(--space-6)',
+          paddingTop: 'var(--space-6)',
+          borderTop: '1px solid var(--border-subtle)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--radius-md)',
+              background: 'var(--amber-glow)', color: 'var(--amber-400)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Library size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, letterSpacing: '-0.03em', fontFamily: 'var(--font-mono)' }}>
+                {stats.readingBooks}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500 }}>읽는 중</div>
+            </div>
           </div>
-          <div className="stat-card-value" style={{ color: 'var(--green-400)' }}>
-            {stats.doneBooks}
-          </div>
-          <div className="stat-card-label">완독한 책</div>
-        </div>
 
-        <div className="glass-card stat-card">
-          <div className="stat-card-icon" style={{ background: 'var(--violet-glow)', color: 'var(--violet-400)' }}>
-            <FileText size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--radius-md)',
+              background: 'var(--green-glow)', color: 'var(--green-400)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Trophy size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, letterSpacing: '-0.03em', fontFamily: 'var(--font-mono)' }}>
+                {stats.doneBooks}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500 }}>완독</div>
+            </div>
           </div>
-          <div className="stat-card-value" style={{ color: 'var(--violet-400)' }}>
-            {stats.totalNotes}
-          </div>
-          <div className="stat-card-label">기록 노트</div>
-        </div>
 
-        <div className="glass-card stat-card">
-          <div className="stat-card-icon" style={{ background: 'var(--rose-glow)', color: 'var(--rose-400)' }}>
-            <Flame size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--radius-md)',
+              background: 'var(--violet-glow)', color: 'var(--violet-400)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <PenTool size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, letterSpacing: '-0.03em', fontFamily: 'var(--font-mono)' }}>
+                {stats.totalNotes}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500 }}>기록</div>
+            </div>
           </div>
-          <div className="stat-card-value" style={{ color: 'var(--rose-400)' }}>
-            {stats.readingDaysThisMonth}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--radius-md)',
+              background: 'var(--rose-glow)', color: 'var(--rose-400)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <CalendarCheck size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, letterSpacing: '-0.03em', fontFamily: 'var(--font-mono)' }}>
+                {stats.readingDaysThisMonth}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500 }}>이번 달</div>
+            </div>
           </div>
-          <div className="stat-card-label">이번 달 독서일</div>
         </div>
       </div>
 
@@ -119,7 +188,9 @@ export default function Dashboard() {
           {/* Currently Reading */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>📖 읽고 있는 책</h2>
+              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Library size={24} className="text-amber-400" /> 읽고 있는 책
+              </h2>
               <Link to="/library" className="btn btn-ghost btn-sm">
                 전체 보기 <ChevronRight size={14} />
               </Link>
@@ -141,9 +212,9 @@ export default function Dashboard() {
                     ? Math.round((book.currentPage / book.totalPages) * 100)
                     : 0;
                   return (
+                    <div key={book.id} className="flex flex-col gap-0">
                     <Link
                       to={`/coaching?bookId=${book.id}`}
-                      key={book.id}
                       className="glass-card"
                       style={{
                         padding: 'var(--space-5)',
@@ -151,6 +222,8 @@ export default function Dashboard() {
                         gap: 'var(--space-4)',
                         textDecoration: 'none',
                         color: 'inherit',
+                        borderBottomLeftRadius: 0,
+                        borderBottomRightRadius: 0,
                       }}
                     >
                       <div
@@ -190,6 +263,46 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </Link>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                      padding: 'var(--space-3) var(--space-5)',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-glass)',
+                      borderTop: 'none',
+                      borderBottomLeftRadius: 'var(--radius-lg)',
+                      borderBottomRightRadius: 'var(--radius-lg)',
+                    }}>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        max={book.totalPages || 99999}
+                        value={book.currentPage}
+                        onChange={async (e) => {
+                          const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), book.totalPages || 99999);
+                          await updateBook(book.id, { current_page: val });
+                          const data = await getBooks();
+                          setBooks(data);
+                        }}
+                        style={{ width: '65px', fontSize: 'var(--text-xs)', padding: '4px 6px', textAlign: 'center' }}
+                        title="현재 페이지"
+                      />
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>/ {book.totalPages}p</span>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        style={{ fontSize: '10px', padding: '4px 10px', marginLeft: 'auto' }}
+                        onClick={async () => {
+                          const newPage = Math.min((book.currentPage || 0) + 10, book.totalPages || 99999);
+                          await updateBook(book.id, { current_page: newPage });
+                          const data = await getBooks();
+                          setBooks(data);
+                        }}
+                        title="10페이지 추가"
+                      >
+                        +10p
+                      </button>
+                    </div>
+                    </div>
                   );
                 })}
               </div>
@@ -199,7 +312,9 @@ export default function Dashboard() {
           {/* Recent Notes */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>📝 최근 기록</h2>
+              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <PenTool size={24} className="text-violet-400" /> 최근 기록
+              </h2>
               <Link to="/notes" className="btn btn-ghost btn-sm">
                 전체 보기 <ChevronRight size={14} />
               </Link>
@@ -247,17 +362,24 @@ export default function Dashboard() {
             className="glass-card-static"
             style={{
               padding: 'var(--space-6)',
-              background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(20,184,166,0.05))',
-              border: '1px solid rgba(245,158,11,0.15)',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(20,184,166,0.05))',
+              border: '1px solid rgba(99,102,241,0.15)',
+              position: 'relative',
+              overflow: 'hidden'
             }}
           >
-            <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)' }}>🧠</div>
+            <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1 }}>
+              <Sparkles size={100} />
+            </div>
+            <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)', color: 'var(--indigo-400)' }}>
+               <Sparkles size={32} />
+            </div>
             <h3 style={{ fontWeight: 700, marginBottom: 'var(--space-2)' }}>AI 독서 코칭</h3>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
               5단계 독서법으로 책을 깊이 이해하고 완전히 내 것으로 만들어보세요.
             </p>
-            <Link to="/coaching" className="btn btn-primary w-full" style={{ justifyContent: 'center' }}>
-              <Brain size={16} /> 코칭 시작하기
+            <Link to="/coaching" className="btn btn-primary w-full" style={{ justifyContent: 'center', gap: '8px' }}>
+              시작하기 <ChevronRight size={16} />
             </Link>
           </div>
 
@@ -286,22 +408,15 @@ export default function Dashboard() {
             <h3 style={{ fontWeight: 700, marginBottom: 'var(--space-4)', fontSize: 'var(--text-base)' }}>📊 독서 요약</h3>
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                  <Clock size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
-                  총 독서 시간
-                </span>
-                <span style={{ fontWeight: 700 }}>{Math.round(stats.totalMinutes / 60)}시간 {stats.totalMinutes % 60}분</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                  <TrendingUp size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Hash size={14} className="text-teal-400" />
                   추출 키워드
                 </span>
                 <span style={{ fontWeight: 700 }}>{stats.totalKeywords}개</span>
               </div>
               <div className="flex items-center justify-between">
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                  <BookOpen size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BookMarked size={14} className="text-violet-400" />
                   전체 서재
                 </span>
                 <span style={{ fontWeight: 700 }}>{stats.totalBooks}권</span>

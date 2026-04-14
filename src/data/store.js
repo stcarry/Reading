@@ -1,4 +1,5 @@
-// Local storage based data management for Reading Giant MVP
+// Local storage & Supabase based data management for Reading Giant MVP
+import { supabase } from '../utils/supabase';
 
 const STORAGE_KEYS = {
   BOOKS: 'rg_books',
@@ -6,162 +7,314 @@ const STORAGE_KEYS = {
   COACHING_SESSIONS: 'rg_coaching',
   READING_LOG: 'rg_reading_log',
   SETTINGS: 'rg_settings',
+  USER: 'rg_user',
 };
 
-// === Books ===
-export function getBooks() {
-  const data = localStorage.getItem(STORAGE_KEYS.BOOKS);
-  return data ? JSON.parse(data) : [];
+// Helper to notify other parts of the app about data changes
+function notifyDataChange(key) {
+  // Dispatch a custom event for the current window
+  window.dispatchEvent(new CustomEvent('rg-data-change', { detail: { key } }));
+  // Storage event is automatically dispatched for other windows/tabs by the browser
 }
 
-export function saveBooks(books) {
-  localStorage.setItem(STORAGE_KEYS.BOOKS, JSON.stringify(books));
-}
+// === Books (Supabase Integrated) ===
+export async function getBooks() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
 
-export function addBook(book) {
-  const books = getBooks();
-  const newBook = {
-    id: Date.now().toString(),
-    title: book.title || '',
-    author: book.author || '',
-    cover: book.cover || '',
-    isbn: book.isbn || '',
-    totalPages: book.totalPages || 0,
-    currentPage: 0,
-    status: 'want', // 'want' | 'reading' | 'done'
-    startDate: null,
-    endDate: null,
-    rating: 0,
-    createdAt: new Date().toISOString(),
-    chapters: book.chapters || [],
-    description: book.description || '',
-  };
-  books.push(newBook);
-  saveBooks(books);
-  return newBook;
-}
+  const { data, error } = await supabase
+    .from('rg_books')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
 
-export function updateBook(id, updates) {
-  const books = getBooks();
-  const idx = books.findIndex(b => b.id === id);
-  if (idx !== -1) {
-    books[idx] = { ...books[idx], ...updates };
-    saveBooks(books);
-    return books[idx];
+  if (error) {
+    console.error('Error fetching books:', error);
+    return [];
   }
-  return null;
+  
+  // Map Supabase columns to frontend property names
+  return data.map(b => ({
+    ...b,
+    cover: b.cover_url,
+    currentPage: b.current_page,
+    totalPages: b.total_pages,
+    startDate: b.start_date,
+    endDate: b.end_date
+  }));
 }
 
-export function deleteBook(id) {
-  const books = getBooks().filter(b => b.id !== id);
-  saveBooks(books);
-}
-
-export function getBooksByStatus(status) {
-  return getBooks().filter(b => b.status === status);
-}
-
-// === Notes ===
-export function getNotes() {
-  const data = localStorage.getItem(STORAGE_KEYS.NOTES);
-  return data ? JSON.parse(data) : [];
-}
-
-export function saveNotes(notes) {
-  localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
-}
-
-export function addNote(note) {
-  const notes = getNotes();
-  const newNote = {
-    id: Date.now().toString(),
-    bookId: note.bookId || '',
-    type: note.type || 'keyword', // 'keyword' | 'chapter_summary' | 'full_summary' | 'three_part'
-    chapter: note.chapter || '',
-    keywords: note.keywords || [],
-    content: note.content || '',
-    category: note.category || 'knowledge', // 'knowledge' | 'conversation' | 'work' | 'daily' | 'thought'
-    threePart: note.threePart || undefined, // { what, soWhat, nowWhat }
-    createdAt: new Date().toISOString(),
-  };
-  notes.push(newNote);
-  saveNotes(notes);
-  return newNote;
-}
-
-export function updateNote(id, updates) {
-  const notes = getNotes();
-  const idx = notes.findIndex(n => n.id === id);
-  if (idx !== -1) {
-    notes[idx] = { ...notes[idx], ...updates };
-    saveNotes(notes);
-    return notes[idx];
+export async function addBook(book) {
+  // 1. 세션 확인
+  let { data: { session } } = await supabase.auth.getSession();
+  let user = session?.user;
+  
+  // 2. 세션이 없다면 getUser로 직접 확인 (네트워크 통신 시도)
+  if (!user) {
+    console.log('Session not in memory, trying to fetch user from server...');
+    const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+    user = fetchedUser;
   }
-  return null;
-}
-
-export function deleteNote(id) {
-  const notes = getNotes().filter(n => n.id !== id);
-  saveNotes(notes);
-}
-
-export function getNotesByBook(bookId) {
-  return getNotes().filter(n => n.bookId === bookId);
-}
-
-// === Coaching Sessions ===
-export function getCoachingSessions() {
-  const data = localStorage.getItem(STORAGE_KEYS.COACHING_SESSIONS);
-  return data ? JSON.parse(data) : [];
-}
-
-export function saveCoachingSessions(sessions) {
-  localStorage.setItem(STORAGE_KEYS.COACHING_SESSIONS, JSON.stringify(sessions));
-}
-
-export function addCoachingSession(session) {
-  const sessions = getCoachingSessions();
-  const newSession = {
-    id: Date.now().toString(),
-    bookId: session.bookId,
-    step: session.step || 1,
-    messages: session.messages || [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  sessions.push(newSession);
-  saveCoachingSessions(sessions);
-  return newSession;
-}
-
-export function updateCoachingSession(id, updates) {
-  const sessions = getCoachingSessions();
-  const idx = sessions.findIndex(s => s.id === id);
-  if (idx !== -1) {
-    sessions[idx] = { ...sessions[idx], ...updates, updatedAt: new Date().toISOString() };
-    saveCoachingSessions(sessions);
-    return sessions[idx];
+  
+  if (!user) {
+    console.error('Final auth check failed. No user found.');
+    throw new Error('로그인 정보가 유효하지 않습니다. [로그아웃] 후 다시 [로그인] 해주세요.');
   }
-  return null;
+
+  console.log('Book added for:', user.email);
+
+  const { data, error } = await supabase
+    .from('rg_books')
+    .insert([{
+      user_id: user.id,
+      title: book.title || '제목 없음',
+      author: book.author || '저자 미상',
+      cover_url: book.cover || '',
+      isbn: book.isbn || '',
+      total_pages: parseInt(book.totalPages) || 0,
+      current_page: 0,
+      status: 'want',
+      chapters: book.chapters || [],
+      description: book.description || '',
+    }])
+    .select();
+
+  if (error) {
+    console.error('Supabase insert error:', error);
+    throw error;
+  }
+  
+  notifyDataChange(STORAGE_KEYS.BOOKS);
+  return data[0];
 }
 
-// === Reading Log ===
-export function getReadingLog() {
-  const data = localStorage.getItem(STORAGE_KEYS.READING_LOG);
-  return data ? JSON.parse(data) : [];
+export async function updateBook(id, updates) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('로그인이 필요합니다.');
+
+  const mappedUpdates = { ...updates };
+  if (updates.cover !== undefined) {
+    mappedUpdates.cover_url = updates.cover;
+    delete mappedUpdates.cover;
+  }
+  if (updates.totalPages !== undefined) {
+    mappedUpdates.total_pages = updates.totalPages;
+    delete mappedUpdates.totalPages;
+  }
+  if (updates.currentPage !== undefined) {
+    mappedUpdates.current_page = updates.currentPage;
+    delete mappedUpdates.currentPage;
+  }
+
+  const { data, error } = await supabase
+    .from('rg_books')
+    .update(mappedUpdates)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select();
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.BOOKS);
+  return data[0];
 }
 
-export function addReadingLog(entry) {
-  const log = getReadingLog();
-  log.push({
-    id: Date.now().toString(),
-    bookId: entry.bookId,
-    date: entry.date || new Date().toISOString().split('T')[0],
-    minutesRead: entry.minutesRead || 0,
-    pagesRead: entry.pagesRead || 0,
-    notes: entry.notes || '',
-  });
-  localStorage.setItem(STORAGE_KEYS.READING_LOG, JSON.stringify(log));
+export async function deleteBook(id) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('rg_books')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.BOOKS);
+}
+
+export function getBooksByStatus(books, status) {
+  return books.filter(b => b.status === status);
+}
+
+// === Notes (Supabase Integrated) ===
+export async function getNotes() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('rg_notes')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching notes:', error);
+    return [];
+  }
+  
+  return data;
+}
+
+export async function addNote(note) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('로그인이 필요합니다.');
+
+  const { data, error } = await supabase
+    .from('rg_notes')
+    .insert([{
+      user_id: user.id,
+      book_id: note.bookId,
+      type: note.type || 'keyword',
+      chapter: note.chapter || '',
+      keywords: note.keywords || [],
+      content: note.content || '',
+      category: note.category || 'knowledge',
+      three_part: note.threePart,
+    }])
+    .select();
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.NOTES);
+  return data[0];
+}
+
+export async function deleteNote(id) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('rg_notes')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.NOTES);
+}
+
+export function getNotesByBook(notes, bookId) {
+  return notes.filter(n => n.bookId === bookId);
+}
+
+// === Coaching Sessions (Supabase Integrated) ===
+export async function getCoachingSessions() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('rg_coaching_sessions')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching coaching sessions:', error);
+    return [];
+  }
+  
+  return data.map(s => ({ ...s, bookId: s.book_id }));
+}
+
+export async function addCoachingSession(session) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('로그인이 필요합니다.');
+
+  const { data, error } = await supabase
+    .from('rg_coaching_sessions')
+    .insert([{
+      user_id: user.id,
+      book_id: session.bookId,
+      step: String(session.step || 1),
+      messages: session.messages || []
+    }])
+    .select();
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.COACHING_SESSIONS);
+  return { ...data[0], bookId: data[0].book_id };
+}
+
+export async function updateCoachingSession(id, updates) {
+  const { error } = await supabase
+    .from('rg_coaching_sessions')
+    .update(updates)
+    .eq('id', id);
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.COACHING_SESSIONS);
+}
+
+// === Stats & Logs (Supabase Integrated) ===
+export async function getReadingLog() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('rg_reading_logs')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('reading_date', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching logs:', error);
+    return [];
+  }
+  
+  return data.map(l => ({ 
+    ...l, 
+    date: l.reading_date,
+    minutesRead: l.minutes_read,
+    pagesRead: l.pages_read
+  }));
+}
+
+export async function addReadingLog(entry) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('로그인이 필요합니다.');
+
+  const { data, error } = await supabase
+    .from('rg_reading_logs')
+    .insert([{
+      user_id: user.id,
+      book_id: entry.bookId,
+      reading_date: entry.date || new Date().toISOString().split('T')[0],
+      minutes_read: entry.minutesRead || 0,
+      pages_read: entry.pagesRead || 0,
+      notes: entry.notes || '',
+    }])
+    .select();
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.READING_LOG);
+  return data[0];
+}
+
+export async function getStats() {
+  const [books, notes, logs] = await Promise.all([
+    getBooks(),
+    getNotes(),
+    getReadingLog()
+  ]);
+
+  const readingBooks = books.filter(b => b.status === 'reading').length;
+  const doneBooks = books.filter(b => b.status === 'done').length;
+  const totalNotes = notes.length;
+  const totalKeywords = notes.reduce((acc, curr) => acc + (curr.keywords?.length || 0), 0);
+  
+  const now = new Date();
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const readingDaysThisMonth = new Set(logs.filter(l => l.date.startsWith(monthStr)).map(l => l.date)).size;
+
+  return {
+    totalBooks: books.length,
+    readingBooks,
+    doneBooks,
+    totalNotes,
+    totalKeywords,
+    readingDaysThisMonth,
+    totalMinutes: logs.reduce((acc, curr) => acc + (curr.minutes_read || 0), 0),
+    totalPages: logs.reduce((acc, curr) => acc + (curr.pages_read || 0), 0),
+  };
 }
 
 // === Aladin & Google Books API ===
@@ -221,42 +374,12 @@ export async function searchBooks(query) {
   }
 }
 
-// === Statistics ===
-export function getStats() {
-  const books = getBooks();
-  const notes = getNotes();
-  const log = getReadingLog();
-  
-  const totalBooks = books.length;
-  const readingBooks = books.filter(b => b.status === 'reading').length;
-  const doneBooks = books.filter(b => b.status === 'done').length;
-  const totalNotes = notes.length;
-  const totalKeywords = notes.reduce((acc, n) => acc + (n.keywords?.length || 0), 0);
-  
-  // Reading days this month
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const readingDaysThisMonth = new Set(
-    log.filter(l => l.date.startsWith(thisMonth)).map(l => l.date)
-  ).size;
-  
-  // Total reading minutes
-  const totalMinutes = log.reduce((acc, l) => acc + (l.minutesRead || 0), 0);
-  
-  return {
-    totalBooks,
-    readingBooks,
-    doneBooks,
-    totalNotes,
-    totalKeywords,
-    readingDaysThisMonth,
-    totalMinutes,
-  };
-}
+
+// === Sample Data (Legacy) ===
 
 // === Sample Data (for demo) ===
 export function initSampleData() {
-  if (getBooks().length > 0) return;
+  if (localStorage.getItem(STORAGE_KEYS.BOOKS)) return;
   
   const sampleBooks = [
     {
@@ -297,7 +420,7 @@ export function initSampleData() {
     },
   ];
   
-  saveBooks(sampleBooks);
+  localStorage.setItem(STORAGE_KEYS.BOOKS, JSON.stringify(sampleBooks));
   
   const sampleNotes = [
     {
@@ -347,7 +470,7 @@ export function initSampleData() {
     },
   ];
   
-  saveNotes(sampleNotes);
+  localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(sampleNotes));
   
   const sampleLog = [];
   const today = new Date();
@@ -363,4 +486,43 @@ export function initSampleData() {
     });
   }
   localStorage.setItem(STORAGE_KEYS.READING_LOG, JSON.stringify(sampleLog));
+}
+
+// === User / Auth (Supabase Integrated) ===
+export async function getCurrentUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
+export async function signUp(email, password, name) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { full_name: name }
+    }
+  });
+  if (error) throw error;
+  return data.user;
+}
+
+export async function login(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) throw error;
+  return data.user;
+}
+
+export async function logout() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+// Helper to keep track of auth state changes globally
+export function onAuthStateChange(callback) {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session?.user || null);
+  });
 }
