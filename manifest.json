@@ -1,0 +1,22 @@
+{
+  "short_name": "리딩 자이언트",
+  "name": "리딩 자이언트 | AI 독서 코치",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#6366f1",
+  "background_color": "#0f172a",
+  "description": "AI와 함께하는 스마트한 독서 기록 및 코칭 서비스",
+  "orientation": "any"
+}
