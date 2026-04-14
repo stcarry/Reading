@@ -162,7 +162,6 @@ export default function Workbook() {
     }
   };
 
-  const progress = workbook ? getWorkbookProgress(workbook) : 0;
 
   // Section component
   const Section = ({ id, icon, title, color, children, hint }) => {
@@ -283,25 +282,14 @@ export default function Workbook() {
       {/* Workbook Content */}
       {workbook && (
         <>
-          {/* Progress Bar */}
           <div className="glass-card-static mb-6" style={{ padding: 'var(--space-4) var(--space-5)' }}>
-            <div className="flex items-center justify-between mb-2">
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>
+            <div className="flex items-center justify-between">
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 700 }}>
                 📖 {workbook.bookTitle}
                 <span style={{ color: 'var(--text-tertiary)', fontWeight: 400, marginLeft: 'var(--space-2)' }}>
                   {workbook.bookAuthor}
                 </span>
               </span>
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--amber-400)' }}>
-                {progress}% 완성
-              </span>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{
-                width: `${progress}%`,
-                background: progress >= 80 ? 'var(--green-400)' : progress >= 40 ? 'var(--amber-400)' : 'var(--teal-400)',
-                transition: 'width 0.5s ease',
-              }} />
             </div>
           </div>
 
@@ -678,11 +666,6 @@ export default function Workbook() {
                   <ArrowLeft size={16} /> Step 2
                 </button>
                 <div style={{ textAlign: 'center' }}>
-                  {progress >= 80 && (
-                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--green-400)', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
-                      🎉 훌륭합니다! 워크북 {progress}% 완성!
-                    </div>
-                  )}
                 </div>
                 <div />
               </div>
