@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Sparkles, PenTool, BarChart3, 
-  Settings, Menu, X, Library, BookMarked, ClipboardList, LogIn, User
+  Settings, Menu, X, Library, BookMarked, LogIn, User
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getCurrentUser, logout, onAuthStateChange } from '../data/store';
@@ -12,7 +12,6 @@ const navItems = [
   { path: '/', icon: LayoutDashboard, label: '대시보드', id: 'nav-dashboard' },
   { path: '/library', icon: Library, label: '내 서재', id: 'nav-library' },
   { path: '/coaching', icon: Sparkles, label: 'AI 독서 코칭', id: 'nav-coaching', badge: '5단계' },
-  { path: '/workbook', icon: ClipboardList, label: '책 해부 워크북', id: 'nav-workbook', badge: 'NEW' },
   { path: '/notes', icon: PenTool, label: '기록 노트', id: 'nav-notes' },
   { path: '/stats', icon: BarChart3, label: '성장 통계', id: 'nav-stats' },
   { label: '도움말', type: 'section' },

@@ -152,7 +152,42 @@ export async function getNotes() {
     return [];
   }
   
-  return data;
+  // Supabase 컬럼(snake_case) → 프론트 필드(camelCase) 매핑
+  return data.map(mapNote);
+}
+
+function mapNote(n) {
+  return {
+    ...n,
+    bookId: n.book_id,
+    createdAt: n.created_at,
+    threePart: n.three_part,
+  };
+}
+
+export async function updateNote(id, updates) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('로그인이 필요합니다.');
+
+  const mapped = {};
+  if (updates.bookId !== undefined) mapped.book_id = updates.bookId || null;
+  if (updates.type !== undefined) mapped.type = updates.type;
+  if (updates.chapter !== undefined) mapped.chapter = updates.chapter;
+  if (updates.keywords !== undefined) mapped.keywords = updates.keywords;
+  if (updates.content !== undefined) mapped.content = updates.content;
+  if (updates.category !== undefined) mapped.category = updates.category;
+  if (updates.threePart !== undefined) mapped.three_part = updates.threePart || null;
+
+  const { data, error } = await supabase
+    .from('rg_notes')
+    .update(mapped)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select();
+
+  if (error) throw error;
+  notifyDataChange(STORAGE_KEYS.NOTES);
+  return data[0] ? mapNote(data[0]) : null;
 }
 
 export async function addNote(note) {
@@ -163,19 +198,19 @@ export async function addNote(note) {
     .from('rg_notes')
     .insert([{
       user_id: user.id,
-      book_id: note.bookId,
+      book_id: note.bookId || null,
       type: note.type || 'keyword',
       chapter: note.chapter || '',
       keywords: note.keywords || [],
       content: note.content || '',
       category: note.category || 'knowledge',
-      three_part: note.threePart,
+      three_part: note.threePart || null,
     }])
     .select();
 
   if (error) throw error;
   notifyDataChange(STORAGE_KEYS.NOTES);
-  return data[0];
+  return mapNote(data[0]);
 }
 
 export async function deleteNote(id) {

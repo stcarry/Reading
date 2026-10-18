@@ -5,7 +5,7 @@ import {
   Send, BookOpen, ChevronRight, Sparkles, Loader, Trash2, FileEdit,
   Mic, Users, Swords, GraduationCap, Brain, AlertCircle
 } from 'lucide-react';
-import { getBooks, getBooksByStatus, addNote, getCoachingSessions, addCoachingSession, updateCoachingSession } from '../data/store';
+import { getBooks, getNotes, addNote, getCoachingSessions, addCoachingSession, updateCoachingSession } from '../data/store';
 import { callOpenAI } from '../utils/openai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -133,8 +133,17 @@ export default function Coaching() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [editingMessageIdx, setEditingMessageIdx] = useState(null);
   const [editingContent, setEditingContent] = useState('');
+  const [chapterSuggestions, setChapterSuggestions] = useState([]);
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!selectedBook) return;
+    getNotes().then(all => {
+      const used = all.filter(n => n.bookId === selectedBook.id).map(n => n.chapter).filter(Boolean);
+      setChapterSuggestions([...new Set([...used, ...(selectedBook.chapters || [])])]);
+    });
+  }, [selectedBook, messages.length]);
 
   useEffect(() => {
     if (chatInputRef.current) {
@@ -222,9 +231,15 @@ export default function Coaching() {
       const bookId = searchParams.get('bookId');
       if (bookId) {
         const book = allBooks.find(b => b.id === bookId);
-        if (book) setSelectedBook(book);
+        if (book) {
+          const stepParam = parseInt(searchParams.get('step'), 10);
+          const step = stepParam >= 1 && stepParam <= 5 ? stepParam : 1;
+          setSelectedBook(book);
+          startStep(step, book);
+        }
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
@@ -279,11 +294,11 @@ export default function Coaching() {
     setInternalizeMode(null);
   };
 
-  const startInternalizeMode = (mode) => {
+  const startInternalizeMode = async (mode) => {
     setInternalizeMode(mode);
     const stepKey = `5_${mode}`;
-    const sessions = getCoachingSessions();
-    const session = sessions.find(s => s.bookId === selectedBook.id && s.step === stepKey);
+    const sessions = await getCoachingSessions();
+    const session = sessions.find(s => s.bookId === selectedBook.id && String(s.step) === stepKey);
     
     if (session && session.messages?.length > 0) {
       setMessages(session.messages);
@@ -298,7 +313,7 @@ export default function Coaching() {
         role: 'ai',
         content: getInternalizeIntro(mode, selectedBook.title, selectedBook.author),
       }];
-      const newSession = addCoachingSession({ bookId: selectedBook.id, step: stepKey, messages: initialMessages });
+      const newSession = await addCoachingSession({ bookId: selectedBook.id, step: stepKey, messages: initialMessages });
       setCurrentSessionId(newSession.id);
       setMessages(initialMessages);
     }
@@ -693,11 +708,15 @@ export default function Coaching() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     <input
                       className="input"
-                      placeholder="방금 읽은 챕터명 (예: 1장. 인지 혁명)"
+                      list="coaching-chapter-suggestions"
+                      placeholder="방금 읽은 챕터명 (예: 3장 운동 기억) — 번호를 넣으면 기록노트에서 순서대로 정렬됩니다"
                       value={step3Form.chapter}
                       onChange={(e) => setStep3Form(prev => ({ ...prev, chapter: e.target.value }))}
                       disabled={messages.length === 0}
                     />
+                    <datalist id="coaching-chapter-suggestions">
+                      {chapterSuggestions.map(c => <option key={c} value={c} />)}
+                    </datalist>
                     <input
                       className="input"
                       placeholder="핵심 키워드 3~5개 (쉼표로 구분. 예: 허구, 협력, 신화)"
