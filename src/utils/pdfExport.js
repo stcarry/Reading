@@ -85,7 +85,7 @@ export async function downloadBookNotesPdf(book, chapters, bookNotes) {
     const chapterKws = [...new Set(ch.notes.flatMap(n => n.keywords || []))];
     const notesHtml = ch.notes.map(note => {
       const typeInfo = getNoteType(note.type);
-      const typeLabel = typeInfo ? `${typeInfo.emoji} ${typeInfo.label}` : note.type;
+      const typeLabel = typeInfo ? typeInfo.label : note.type;
       const noteDate = new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
       const kwsHtml = (note.keywords || []).map(k => `<span style="display:inline-block; background:#e0e7ff; color:#4338ca; padding:2px 8px; border-radius:12px; font-size:11px; margin-right:4px; font-weight:600;">#${escapeHtml(k)}</span>`).join('');
 

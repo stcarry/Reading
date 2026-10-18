@@ -1,20 +1,24 @@
 // 기록노트 공용 유틸: 노트 유형 정의, 챕터 정렬, 구조화된 본문 파싱
+import {
+  KeyRound, FileText, Layers, Quote, CalendarDays, ClipboardList,
+  BookOpen, MessageCircle, Briefcase, Sunrise, Lightbulb,
+} from 'lucide-react';
 
 export const NOTE_TYPES = [
-  { key: 'keyword', label: '키워드 노트', emoji: '🔑', desc: '핵심 키워드 + 자기 언어 요약' },
-  { key: 'chapter_summary', label: '챕터 요약', emoji: '📄', desc: 'A4 반쪽 이내 요약' },
-  { key: 'three_part', label: '3단 구조', emoji: '📐', desc: 'What / So What / Now What' },
-  { key: 'quote', label: '인상 깊은 구절', emoji: '❝', desc: '구절 + 페이지 + 나의 생각' },
-  { key: 'action_plan', label: '30일 실천 계획', emoji: '🗓', desc: '주차별 실천 계획' },
-  { key: 'full_summary', label: '전체 요약', emoji: '📋', desc: 'A4 2-3장 분량 재정리' },
+  { key: 'keyword', label: '키워드 노트', icon: KeyRound, desc: '핵심 키워드 + 자기 언어 요약' },
+  { key: 'chapter_summary', label: '챕터 요약', icon: FileText, desc: 'A4 반쪽 이내 요약' },
+  { key: 'three_part', label: '3단 구조', icon: Layers, desc: 'What / So What / Now What' },
+  { key: 'quote', label: '인상 깊은 구절', icon: Quote, desc: '구절 + 페이지 + 나의 생각' },
+  { key: 'action_plan', label: '30일 실천 계획', icon: CalendarDays, desc: '주차별 실천 계획' },
+  { key: 'full_summary', label: '전체 요약', icon: ClipboardList, desc: 'A4 2-3장 분량 재정리' },
 ];
 
 export const CATEGORIES = [
-  { key: 'knowledge', label: '📖 지식', desc: '책/강의에서 깨달은 것' },
-  { key: 'conversation', label: '💬 대화', desc: '대화 중 영감 얻은 것' },
-  { key: 'work', label: '💼 일', desc: '일 관련 노하우' },
-  { key: 'daily', label: '🌅 일상', desc: '일상 기록과 감정' },
-  { key: 'thought', label: '💡 생각', desc: '떠오른 아이디어' },
+  { key: 'knowledge', label: '지식', icon: BookOpen, desc: '책/강의에서 깨달은 것' },
+  { key: 'conversation', label: '대화', icon: MessageCircle, desc: '대화 중 영감 얻은 것' },
+  { key: 'work', label: '일', icon: Briefcase, desc: '일 관련 노하우' },
+  { key: 'daily', label: '일상', icon: Sunrise, desc: '일상 기록과 감정' },
+  { key: 'thought', label: '생각', icon: Lightbulb, desc: '떠오른 아이디어' },
 ];
 
 export const getNoteType = (key) => NOTE_TYPES.find(t => t.key === key);

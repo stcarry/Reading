@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { X, Mail, Lock, User } from 'lucide-react';
 import { login, signUp } from '../data/store';
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
@@ -15,27 +15,17 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!email || !password) { setError('이메일과 비밀번호를 입력해주세요.'); return; }
+    if (isSignUp && !name) { setError('이름을 입력해주세요.'); return; }
     setLoading(true);
-
     try {
-      if (!email || !password) {
-        setError('이메일과 비밀번호를 입력해주세요.');
-        return;
-      }
-
       let user;
       if (isSignUp) {
-        if (!name) {
-          setError('이름을 입력해주세요.');
-          setLoading(false);
-          return;
-        }
         user = await signUp(email, password, name);
-        alert('회원가입이 완료되었습니다! 이메일을 확인해 주세요 (설정에 따라 확인이 필요할 수 있습니다).');
+        alert('회원가입이 완료되었습니다. 이메일을 확인해 주세요 (설정에 따라 확인이 필요할 수 있습니다).');
       } else {
         user = await login(email, password);
       }
-      
       onLoginSuccess(user);
       onClose();
     } catch (err) {
@@ -48,110 +38,54 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
-        className="modal glass-card-static" 
-        onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '400px', width: '90%', animation: 'slideUp 0.3s var(--transition-base)' }}
-      >
+      <div className="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="login-title" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">
-            {isSignUp ? '회원가입' : '로그인'}
-          </h2>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>
-            <X size={20} />
-          </button>
+          <h2 className="modal-title" id="login-title">{isSignUp ? '회원가입' : '로그인'}</h2>
+          <button className="btn btn-ghost muted btn-icon" onClick={onClose} aria-label="닫기"><X size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-body flex flex-col gap-4">
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
-            리딩 자이언트와 함께 성장하는 독서 여정을 시작하세요.
-          </p>
+        <form onSubmit={handleSubmit} className="modal-body">
+          <p className="t-footnote c-2 mb-4">서재, 코칭 대화, 기록 노트가 계정에 안전하게 저장됩니다.</p>
 
           {isSignUp && (
-            <div className="flex flex-col gap-1">
-              <label style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-tertiary)' }}>이름</label>
-              <div style={{ position: 'relative' }}>
-                <UserPlus size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-                <input
-                  className="input"
-                  type="text"
-                  placeholder="홍길동"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  style={{ paddingLeft: '36px', width: '100%' }}
-                  required
-                />
+            <div className="field">
+              <label htmlFor="login-name">이름</label>
+              <div className="input-wrap">
+                <User size={16} />
+                <input id="login-name" className="input" type="text" placeholder="홍길동" value={name} onChange={e => setName(e.target.value)} autoComplete="name" />
               </div>
             </div>
           )}
 
-          <div className="flex flex-col gap-1">
-            <label style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-tertiary)' }}>이메일</label>
-            <div style={{ position: 'relative' }}>
-              <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-              <input
-                className="input"
-                type="email"
-                placeholder="example@mail.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                style={{ paddingLeft: '36px', width: '100%' }}
-                required
-              />
+          <div className="field">
+            <label htmlFor="login-email">이메일</label>
+            <div className="input-wrap">
+              <Mail size={16} />
+              <input id="login-email" className="input" type="email" placeholder="example@mail.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
             </div>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-tertiary)' }}>비밀번호</label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-              <input
-                className="input"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                style={{ paddingLeft: '36px', width: '100%' }}
-                required
-              />
+          <div className="field">
+            <label htmlFor="login-password">비밀번호</label>
+            <div className="input-wrap">
+              <Lock size={16} />
+              <input id="login-password" className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete={isSignUp ? 'new-password' : 'current-password'} required />
             </div>
           </div>
 
-          {error && (
-            <div style={{ color: 'var(--rose-400)', fontSize: 'var(--text-xs)', padding: 'var(--space-2)', background: 'rgba(244,63,94,0.1)', borderRadius: 'var(--radius-sm)' }}>
-              {error}
-            </div>
-          )}
+          {error && <div className="hint" style={{ color: 'var(--red)' }}>{error}</div>}
 
-          <button 
-            type="submit" 
-            className="btn btn-primary w-full" 
-            style={{ justifyContent: 'center', marginTop: 'var(--space-2)' }}
-            disabled={loading}
-          >
-            {loading ? '처리 중...' : (isSignUp ? '가입하기' : '로그인')}
-            {!loading && (isSignUp ? <UserPlus size={18} style={{ marginLeft: '8px' }} /> : <LogIn size={18} style={{ marginLeft: '8px' }} />)}
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={loading}>
+            {loading ? '처리 중…' : (isSignUp ? '가입하기' : '로그인')}
           </button>
 
-          <div style={{ textAlign: 'center', marginTop: 'var(--space-2)' }}>
-            <button 
-              type="button" 
-              className="btn btn-ghost" 
-              style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
+          <div className="text-center mt-4">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setIsSignUp(!isSignUp); setError(''); }}>
               {isSignUp ? '이미 계정이 있나요? 로그인' : '계정이 없으신가요? 회원가입'}
             </button>
           </div>
         </form>
       </div>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}} />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, BookMarked, Check, ChevronRight, Flame, LogIn, NotebookPen, Plus,
+  ArrowRight, BookMarked, Check, ChevronRight, Flame, LogIn, NotebookPen, Plus, BookOpen,
 } from 'lucide-react';
 import { getBooks, getNotes, getCoachingSessions, getCurrentUser, updateBook } from '../data/store';
 import { getNoteType, groupNotesByChapter } from '../utils/notes';
+import { EmptyState, PageSkeleton } from '../components/ui';
 
 const COACH_STEPS = [
   { num: 1, title: '예열', desc: '구조 파악' },
@@ -43,31 +44,25 @@ export default function Dashboard() {
     let ignore = false;
 
     const fetchAll = async () => {
-      const u = await getCurrentUser();
-      if (ignore) return;
-      setUser(u);
-      if (!u) {
-        setLoaded(true);
-        return;
+      try {
+        const u = await getCurrentUser();
+        if (ignore) return;
+        setUser(u);
+        if (!u) { setLoaded(true); return; }
+        const [b, n, s] = await Promise.all([getBooks(), getNotes(), getCoachingSessions()]);
+        if (ignore) return;
+        setBooks(b); setNotes(n); setSessions(s);
+      } catch (err) {
+        console.error('Dashboard load failed:', err);
+      } finally {
+        if (!ignore) setLoaded(true);
       }
-      const [b, n, s] = await Promise.all([getBooks(), getNotes(), getCoachingSessions()]);
-      if (ignore) return;
-      setBooks(b);
-      setNotes(n);
-      setSessions(s);
-      setLoaded(true);
     };
 
     fetchAll();
-
-    const onChange = () => {
-      fetchAll();
-    };
+    const onChange = () => { fetchAll(); };
     window.addEventListener('rg-data-change', onChange);
-    return () => {
-      ignore = true;
-      window.removeEventListener('rg-data-change', onChange);
-    };
+    return () => { ignore = true; window.removeEventListener('rg-data-change', onChange); };
   }, []);
 
   // 지금 읽는 책: '읽는 중' 상태 + (없다면) 최근 기록/코칭이 있는 책
@@ -105,7 +100,7 @@ export default function Dashboard() {
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const start = new Date(today);
-    start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7); // 12주 전 일요일부터
+    start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7);
 
     const cells = [];
     for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
@@ -116,7 +111,7 @@ export default function Dashboard() {
 
     let streak = 0;
     const cursor = new Date(today);
-    if (!counts[dayKey(cursor)]) cursor.setDate(cursor.getDate() - 1); // 오늘 아직 안 했으면 어제부터
+    if (!counts[dayKey(cursor)]) cursor.setDate(cursor.getDate() - 1);
     while (counts[dayKey(cursor)]) { streak++; cursor.setDate(cursor.getDate() - 1); }
 
     return { cells, activeDays, streak, todayCount: counts[dayKey(today)] || 0 };
@@ -139,7 +134,7 @@ export default function Dashboard() {
     await updateBook(book.id, { current_page: val });
   };
 
-  if (!loaded) return <div className="page-container" />;
+  if (!loaded) return <PageSkeleton rows={3} />;
 
   const name = user?.user_metadata?.full_name || user?.email?.split('@')[0];
   const primary = activeBooks[0];
@@ -147,70 +142,101 @@ export default function Dashboard() {
 
   if (!user) {
     return (
-      <div className="page-container animate-fade-in">
+      <div className="page-container animate-in">
         <section className="db-hero">
           <div className="db-kicker">{today}</div>
           <h1 className="db-title">로그인하고 독서를 이어가세요</h1>
           <p className="db-sub">서재, 코칭 대화, 기록 노트는 계정에 안전하게 저장되어 있습니다.</p>
-          <div className="db-hero-cta" style={{ color: 'var(--text-secondary)' }}>
-            <LogIn size={16} /> 왼쪽 메뉴 하단의 <strong>로그인</strong> 버튼을 눌러주세요
+          <div className="db-hero-row">
+            <button className="btn btn-primary btn-lg" onClick={() => window.dispatchEvent(new Event('rg-open-login'))} id="dashboard-login-btn">
+              <LogIn size={18} /> 로그인 / 가입
+            </button>
           </div>
         </section>
+        <div className="section-head"><h2>리딩 자이언트는</h2></div>
+        <div className="list">
+          {[
+            ['서재', '읽는 책과 완독한 책을 한눈에 관리합니다.', '/library'],
+            ['AI 독서 코칭', '예열 → 몰입 → 중간점검 → 정리 → 내재화, 5단계로 책을 내 것으로.', '/coaching'],
+            ['기록 노트', '챕터 순서대로 쌓이는 나의 독서 기록, PDF로 내보내기.', '/notes'],
+            ['독서법 가이드', '김익환 교수의 AI 5단계 독서법을 먼저 읽어보세요.', '/guide'],
+          ].map(([t, d, to]) => (
+            <Link key={to} to={to} className="list-row interactive">
+              <div className="list-body">
+                <div className="list-title">{t}</div>
+                <div className="list-sub">{d}</div>
+              </div>
+              <ChevronRight size={16} className="list-chevron" />
+            </Link>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page-container animate-fade-in">
+    <div className="page-container animate-in">
       {/* Hero: 오늘 이어서 할 일 */}
       <section className="db-hero">
         <div className="db-kicker">{today}</div>
-        <h1 className="db-title">{name}님, {primary ? '어제에 이어서 읽어볼까요?' : '어떤 책부터 시작할까요?'}</h1>
+        <h1 className="db-title">{name}님, {primary ? '이어서 읽어볼까요?' : '어떤 책부터 시작할까요?'}</h1>
         {primary ? (
           <div className="db-hero-row">
             <p className="db-sub">
-              <strong>{primary.book.title}</strong> — 코칭 {primary.done.size}/5단계 완료
+              <strong>{primary.book.title}</strong> · 코칭 {primary.done.size}/5단계 완료
               {primary.lastNote?.chapter && <> · 마지막 기록 「{primary.lastNote.chapter}」</>}
             </p>
-            <Link to={`/coaching?bookId=${primary.book.id}&step=${primary.next.num}`} className="btn btn-primary db-hero-cta-btn" id="dashboard-continue-btn">
+            <Link to={`/coaching?bookId=${primary.book.id}&step=${primary.next.num}`} className="btn btn-primary btn-lg" id="dashboard-continue-btn">
               {primary.next.num}단계 {primary.next.title} 이어하기 <ArrowRight size={16} />
             </Link>
           </div>
         ) : (
           <div className="db-hero-row">
             <p className="db-sub">서재에 책을 추가하고 ‘읽는 중’으로 바꾸면 이곳에 진행 상황이 표시됩니다.</p>
-            <Link to="/library" className="btn btn-primary db-hero-cta-btn"><Plus size={16} /> 서재로 가기</Link>
+            <Link to="/library" className="btn btn-primary btn-lg"><Plus size={16} /> 서재로 가기</Link>
           </div>
         )}
         <div className="db-hero-stats">
-          <div><span className="db-stat-num">{activity.streak}</span><span className="db-stat-label"><Flame size={12} /> 연속 기록일</span></div>
-          <div><span className="db-stat-num">{activity.activeDays}</span><span className="db-stat-label">최근 {WEEKS}주 활동일</span></div>
-          <div><span className="db-stat-num">{notes.length}</span><span className="db-stat-label">누적 기록</span></div>
-          <div><span className="db-stat-num">{books.filter(b => b.status === 'done').length}</span><span className="db-stat-label">완독</span></div>
+          <div className="stat">
+            <div className="stat-label"><Flame size={13} /> 연속 기록일</div>
+            <div className="stat-value">{activity.streak}<small>일</small></div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">최근 {WEEKS}주 활동일</div>
+            <div className="stat-value">{activity.activeDays}<small>일</small></div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">누적 기록</div>
+            <div className="stat-value">{notes.length}<small>개</small></div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">완독</div>
+            <div className="stat-value">{books.filter(b => b.status === 'done').length}<small>권</small></div>
+          </div>
         </div>
       </section>
 
       <div className="db-grid">
         {/* 왼쪽: 지금 읽는 책 */}
         <div className="db-col">
-          <div className="db-section-head">
+          <div className="section-head">
             <h2>지금 읽는 책</h2>
             <Link to="/library" className="btn btn-ghost btn-sm">서재 <ChevronRight size={14} /></Link>
           </div>
 
           {activeBooks.length === 0 ? (
-            <div className="glass-card-static empty-state" style={{ padding: 'var(--space-8)' }}>
-              <div className="empty-state-icon">📚</div>
-              <div className="empty-state-title">읽고 있는 책이 없어요</div>
-              <div className="empty-state-desc">서재에서 책 상태를 ‘읽는 중’으로 바꿔보세요.</div>
-              <Link to="/library" className="btn btn-primary"><Plus size={16} /> 서재로 가기</Link>
-            </div>
+            <EmptyState
+              icon={<BookOpen size={24} />}
+              title="읽고 있는 책이 없어요"
+              desc="서재에서 책 상태를 ‘읽는 중’으로 바꿔보세요."
+              action={<Link to="/library" className="btn btn-tinted"><Plus size={16} /> 서재로 가기</Link>}
+            />
           ) : activeBooks.map(({ book, chapters, lastNote, done, next, noteCount }) => {
             const progress = book.totalPages > 0 ? Math.round((book.currentPage / book.totalPages) * 100) : null;
             return (
-              <article key={book.id} className="db-book glass-card-static">
+              <article key={book.id} className="card db-book">
                 <div className="db-book-top">
-                  <div className="db-book-cover">
+                  <div className="cover cover-md">
                     {book.cover ? <img src={book.cover} alt={book.title} /> : <BookMarked size={22} />}
                   </div>
                   <div className="db-book-info">
@@ -218,15 +244,15 @@ export default function Dashboard() {
                     <div className="db-book-author">{book.author}</div>
                     {progress !== null && (
                       <div className="db-book-progress">
-                        <div className="progress-bar"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
+                        <div className="progress"><i style={{ width: `${progress}%` }} /></div>
                         <div className="db-page-row">
                           <input
-                            type="number" className="input" min="0" max={book.totalPages}
+                            type="number" className="input input-sm" min="0" max={book.totalPages}
                             value={book.currentPage}
                             onChange={(e) => setPage(book, parseInt(e.target.value) || 0)}
                             aria-label="현재 페이지"
                           />
-                          <span>/ {book.totalPages}p · {progress}%</span>
+                          <span className="num">/ {book.totalPages}p · {progress}%</span>
                           <button className="btn btn-ghost btn-sm" onClick={() => setPage(book, (book.currentPage || 0) + 10)}>+10p</button>
                         </div>
                       </div>
@@ -240,7 +266,7 @@ export default function Dashboard() {
                     const state = done.has(s.num) ? 'done' : s.num === next.num ? 'next' : '';
                     return (
                       <Link key={s.num} to={`/coaching?bookId=${book.id}&step=${s.num}`} className={`db-step ${state}`} title={`${s.num}단계 ${s.title} · ${s.desc}`}>
-                        <span className="db-step-dot">{state === 'done' ? <Check size={12} /> : s.num}</span>
+                        <span className="db-step-dot">{state === 'done' ? <Check size={13} strokeWidth={3} /> : s.num}</span>
                         <span className="db-step-label">{s.title}</span>
                       </Link>
                     );
@@ -248,13 +274,13 @@ export default function Dashboard() {
                 </div>
 
                 <div className="db-book-foot">
-                  <Link to={`/notes?bookId=${book.id}`} className="db-book-notes">
+                  <Link to={`/notes?bookId=${book.id}`} className="db-book-notes truncate">
                     <NotebookPen size={14} />
                     {noteCount > 0
                       ? <>챕터 {chapters.length}개 · 기록 {noteCount}개{lastNote?.chapter && <span> · 최근 「{lastNote.chapter}」</span>}</>
                       : '아직 기록이 없어요'}
                   </Link>
-                  <Link to={`/coaching?bookId=${book.id}&step=${next.num}`} className="btn btn-primary btn-sm">
+                  <Link to={`/coaching?bookId=${book.id}&step=${next.num}`} className="btn btn-tinted btn-sm">
                     {done.size === 5 ? '내재화 계속하기' : `${next.num}단계 ${next.title}`} <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -265,10 +291,10 @@ export default function Dashboard() {
 
         {/* 오른쪽: 활동 · 최근 기록 · 키워드 */}
         <div className="db-col">
-          <div className="glass-card-static db-panel">
-            <div className="db-panel-head">
+          <div className="card">
+            <div className="card-head">
               <h3>독서 활동</h3>
-              <span>{activity.todayCount > 0 ? '오늘 기록 완료 ✓' : '오늘 아직 기록 없음'}</span>
+              <span className="meta">{activity.todayCount > 0 ? '오늘 기록 완료' : '오늘 아직 기록 없음'}</span>
             </div>
             <div className="db-heatmap">
               {activity.cells.map(c => (
@@ -286,8 +312,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="glass-card-static db-panel">
-            <div className="db-panel-head">
+          <div className="card">
+            <div className="card-head">
               <h3>최근 기록</h3>
               <Link to="/notes" className="btn btn-ghost btn-sm">전체 <ChevronRight size={14} /></Link>
             </div>
@@ -303,11 +329,11 @@ export default function Dashboard() {
                     <li key={n.id}>
                       <Link to={n.bookId ? `/notes?bookId=${n.bookId}` : '/notes'}>
                         <div className="db-recent-top">
-                          <span className="db-recent-chapter">{t?.emoji} {n.chapter || t?.label || '기록'}</span>
+                          <span className="db-recent-chapter">{n.chapter || t?.label || '기록'}</span>
                           <span className="db-recent-date">{new Date(n.createdAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}</span>
                         </div>
                         <div className="db-recent-snippet">{snippet}</div>
-                        <div className="db-recent-book">{book?.title || '책 미지정'}</div>
+                        <div className="db-recent-book">{book?.title || '책 미지정'}{t ? ` · ${t.label}` : ''}</div>
                       </Link>
                     </li>
                   );
@@ -317,8 +343,8 @@ export default function Dashboard() {
           </div>
 
           {topKeywords.length > 0 && (
-            <div className="glass-card-static db-panel">
-              <div className="db-panel-head"><h3>자주 등장한 키워드</h3></div>
+            <div className="card">
+              <div className="card-head"><h3>자주 등장한 키워드</h3></div>
               <div className="db-keywords">
                 {topKeywords.map(([k, c]) => <span key={k}>#{k}{c > 1 && <em>{c}</em>}</span>)}
               </div>
