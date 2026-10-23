@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>리딩 자이언트</title>
+    <meta name="color-scheme" content="dark" />
+    <style>html,body{background:#000;margin:0}</style>
+    <script>
+      // GitHub Pages SPA 폴백: 요청된 경로를 저장하고 앱 루트로 이동하면 main.jsx가 복원합니다.
+      (function () {
+        var base = '/Reading/';
+        var path = window.location.pathname + window.location.search + window.location.hash;
+        sessionStorage.setItem('rg:redirect', path);
+        window.location.replace(base);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
